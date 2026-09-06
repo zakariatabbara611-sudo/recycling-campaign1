@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-3xl font-bold mb-6">Team Noticeboard</h2>
+
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-8">
+    <form method="POST">
+        <textarea name="message" placeholder="Write a notice or update for the team..." class="w-full border p-3 rounded-lg mb-3" rows="3" required></textarea>
+        <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold">Post Notice</button>
+    </form>
+</div>
+
+<div class="space-y-4">
+    {% for notice in notices %}
+    <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+        <div class="flex justify-between items-center mb-2">
+            <span class="font-bold text-emerald-800">{{ notice.author_name }}</span>
+            <span class="text-xs text-slate-400">{{ notice.created_at.strftime('%b %d, %H:%M') }}</span>
+        </div>
+        <p class="text-slate-700">{{ notice.message }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
