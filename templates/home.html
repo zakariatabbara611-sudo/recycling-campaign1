@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Hero Banner -->
+    <div class="bg-gradient-to-r from-emerald-700 to-green-600 text-white rounded-2xl p-8 mb-10 shadow-xl flex flex-col md:flex-row items-center justify-between">
+        <div class="md:w-2/3 mb-6 md:mb-0">
+            <h1 class="text-4xl font-black mb-3 tracking-wide">FARZI Recycling Campaign</h1>
+            <p class="text-emerald-100 text-lg leading-relaxed">
+                Welcome to the official portal for our high school plastic bottle recycling initiative! Together, we track volunteer shifts, organize collection points, and work towards a cleaner environment.
+            </p>
+        </div>
+        <div class="bg-white/10 p-4 rounded-xl border border-white/20 backdrop-blur-sm text-center">
+            <span class="text-3xl font-extrabold block">{{ users|length }}</span>
+            <span class="text-emerald-100 text-sm font-semibold uppercase tracking-wider">Active Members</span>
+        </div>
+    </div>
+
+    <!-- Main Content: Volunteer Directory -->
+    <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+        <div class="flex items-center justify-between mb-6 pb-4 border-b">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Campaign Volunteer Directory</h2>
+                <p class="text-sm text-gray-500">All registered volunteers and managers contributing to FARZI.</p>
+            </div>
+            <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full uppercase">Public Directory</span>
+        </div>
+
+        {% if users %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {% for u in users %}
+            <div class="border rounded-lg p-4 bg-gray-50 hover:bg-emerald-50/50 transition-colors flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-lg flex-shrink-0">
+                    {{ u.full_name[0] | upper }}
+                </div>
+                <div class="overflow-hidden">
+                    <p class="font-bold text-gray-800 truncate">{{ u.full_name }}</p>
+                    <p class="text-xs text-gray-500 truncate">@{{ u.username }}</p>
+                    <span class="inline-block mt-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded {% if u.role == 'admin' %}bg-purple-100 text-purple-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                        {{ 'Manager' if u.role == 'admin' else 'Volunteer' }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">
+            <p>No volunteers registered yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
