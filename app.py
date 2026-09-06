@@ -6,14 +6,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'farzi_secret_key_2026'
 
-# Database configuration
-db_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'recycling.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+# Database Setup (Supports Render PostgreSQL or local SQLite fallback)
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///recycling.db')
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# Database Models
+# --- DATABASE MODELS ---
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -36,18 +39,18 @@ class Notice(db.Model):
     title = db.Column(db.String(150), nullable=False)
     content = db.Column(db.Text, nullable=False)
 
-# Main Home Page (Public Volunteer Directory)
+# --- ROUTES ---
+
 @app.route('/')
 def home():
     all_users = User.query.order_by(User.full_name.asc()).all()
     return render_template('home.html', users=all_users)
 
-# Auth Routes
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
@@ -68,7 +71,6 @@ def logout():
     flash("Successfully logged out.", "success")
     return redirect(url_for('home'))
 
-# Manager Dashboard & Management
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if session.get('role') != 'admin':
@@ -82,9 +84,9 @@ def admin_dashboard():
 def add_user():
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
-    username = request.form.get('username')
-    full_name = request.form.get('full_name')
-    password = request.form.get('password')
+    username = request.form.get('username', '').strip()
+    full_name = request.form.get('full_name', '').strip()
+    password = request.form.get('password', '').strip()
     role = request.form.get('role', 'volunteer')
     
     if User.query.filter_by(username=username).first():
@@ -106,6 +108,9 @@ def delete_user(user_id):
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
     user = User.query.get_or_404(user_id)
+    if user.username == 'Zakaria':
+        flash("Cannot delete main admin account.", "error")
+        return redirect(url_for('admin_dashboard'))
     db.session.delete(user)
     db.session.commit()
     flash("Account deleted.", "success")
@@ -151,7 +156,6 @@ def delete_shift(shift_id):
     flash("Shift removed.", "success")
     return redirect(url_for('admin_dashboard'))
 
-# Volunteer Dashboard & Excuses
 @app.route('/volunteer/dashboard')
 def volunteer_dashboard():
     if not session.get('user_id'):
@@ -171,7 +175,6 @@ def submit_excuse(shift_id):
         flash("Excuse submitted.", "success")
     return redirect(url_for('volunteer_dashboard'))
 
-# Noticeboard Routes
 @app.route('/noticeboard')
 def noticeboard():
     if not session.get('user_id'):
@@ -191,9 +194,23 @@ def add_notice():
     flash("Notice posted.", "success")
     return redirect(url_for('noticeboard'))
 
-# Initialize database
+# Database Initialization & Admin Seeding
 with app.app_context():
     db.create_all()
+    admin_user = User.query.filter_by(username='Zakaria').first()
+    if not admin_user:
+        admin = User(
+            username='Zakaria',
+            full_name='Zakaria (Project Manager)',
+            password_hash=generate_password_hash('zakariaprojectmanager1'),
+            role='admin'
+        )
+        db.session.add(admin)
+        db.session.commit()
+    else:
+        # Update existing user password hash to guarantee login works
+        admin_user.password_hash = generate_password_hash('zakariaprojectmanager1')
+        db.session.commit()
 
 if __name__ == '__main__':
     app.run(debug=True)
