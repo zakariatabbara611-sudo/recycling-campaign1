@@ -1,12 +1,16 @@
 import os
+import random
+import string
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'farzi_secret_key_2026'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# Database Setup (Supports Render PostgreSQL or local SQLite fallback)
+# Database Setup
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///recycling.db')
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -34,17 +38,24 @@ class Shift(db.Model):
     excused = db.Column(db.Boolean, default=False)
     excuse_reason = db.Column(db.String(255), nullable=True)
 
+class Metric(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    category = db.Column(db.String(20), unique=True, nullable=False)
+    count = db.Column(db.Integer, default=0)
+
 class Notice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(150), nullable=False)
-    content = db.Column(db.Text, nullable=False)
+    author_name = db.Column(db.String(80), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # --- ROUTES ---
 
 @app.route('/')
 def home():
     all_users = User.query.order_by(User.full_name.asc()).all()
-    return render_template('home.html', users=all_users)
+    metrics = {m.category: m.count for m in Metric.query.all()}
+    return render_template('home.html', users=all_users, metrics=metrics)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -54,6 +65,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
+            session.permanent = True
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role
@@ -71,14 +83,20 @@ def logout():
     flash("Successfully logged out.", "success")
     return redirect(url_for('home'))
 
-@app.route('/admin/dashboard')
+# --- ADMIN DASHBOARD & USER MANAGEMENT ---
+
+@app.route('/admin/dashboard', methods=['GET', 'POST'])
 def admin_dashboard():
     if session.get('role') != 'admin':
+        flash("Access restricted to managers.", "error")
         return redirect(url_for('login'))
+        
     volunteers = User.query.filter_by(role='volunteer').all()
     managers = User.query.filter_by(role='admin').all()
     shifts = Shift.query.all()
-    return render_template('dashboard_admin.html', volunteers=volunteers, managers=managers, shifts=shifts)
+    metrics = {m.category: m for m in Metric.query.all()}
+    
+    return render_template('dashboard_admin.html', volunteers=volunteers, managers=managers, shifts=shifts, metrics=metrics)
 
 @app.route('/admin/add_user', methods=['POST'])
 def add_user():
@@ -100,7 +118,7 @@ def add_user():
         )
         db.session.add(new_user)
         db.session.commit()
-        flash("Account created successfully!", "success")
+        flash(f"Account created for {full_name}!", "success")
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
@@ -143,7 +161,7 @@ def add_shift():
     )
     db.session.add(new_shift)
     db.session.commit()
-    flash("Shift assigned.", "success")
+    flash("Shift assigned successfully!", "success")
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/delete_shift/<int:shift_id>', methods=['POST'])
@@ -153,50 +171,73 @@ def delete_shift(shift_id):
     shift = Shift.query.get_or_404(shift_id)
     db.session.delete(shift)
     db.session.commit()
-    flash("Shift removed.", "success")
+    flash("Shift removed successfully.", "success")
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/update_metrics', methods=['POST'])
+def update_metrics():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+        
+    for cat in ['daily', 'weekly', 'monthly', 'yearly']:
+        val = request.form.get(cat)
+        if val is not None and val.isdigit():
+            m = Metric.query.filter_by(category=cat).first()
+            if m:
+                m.count = int(val)
+                
+    db.session.commit()
+    flash("Bottle collection metrics updated!", "success")
+    return redirect(url_for('admin_dashboard'))
+
+# --- VOLUNTEER DASHBOARD & EXCUSES ---
 
 @app.route('/volunteer/dashboard')
 def volunteer_dashboard():
     if not session.get('user_id'):
         return redirect(url_for('login'))
     user = User.query.get(session['user_id'])
-    return render_template('dashboard_volunteer.html', user=user)
+    shifts = Shift.query.filter_by(user_id=user.id).all()
+    tomorrow_alert = any(not s.excused for s in shifts)
+    return render_template('dashboard_volunteer.html', user=user, shifts=shifts, tomorrow_alert=tomorrow_alert)
 
-@app.route('/volunteer/submit_excuse/<int:shift_id>', methods=['POST'])
+@app.route('/volunteer/excuse/<int:shift_id>', methods=['POST'])
 def submit_excuse(shift_id):
     if not session.get('user_id'):
         return redirect(url_for('login'))
     shift = Shift.query.get_or_404(shift_id)
     if shift.user_id == session['user_id']:
         shift.excused = True
-        shift.excuse_reason = request.form.get('reason')
+        shift.excuse_reason = request.form.get('reason', 'No reason provided')
         db.session.commit()
-        flash("Excuse submitted.", "success")
+        flash("Excuse submitted to management.", "success")
     return redirect(url_for('volunteer_dashboard'))
 
-@app.route('/noticeboard')
+# --- NOTICEBOARD (SUPPORTS BOTH GET AND POST) ---
+
+@app.route('/noticeboard', methods=['GET', 'POST'])
 def noticeboard():
-    if not session.get('user_id'):
+    if 'user_id' not in session:
+        flash("Please log in to view the team noticeboard.", "error")
         return redirect(url_for('login'))
-    notices = Notice.query.all()
+        
+    if request.method == 'POST':
+        msg = request.form.get('message', '').strip()
+        if msg:
+            n = Notice(author_name=session['username'], message=msg)
+            db.session.add(n)
+            db.session.commit()
+            flash("Notice posted successfully!", "success")
+            
+    notices = Notice.query.order_by(Notice.created_at.desc()).all()
     return render_template('noticeboard.html', notices=notices)
 
-@app.route('/noticeboard/add', methods=['POST'])
-def add_notice():
-    if session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    title = request.form.get('title')
-    content = request.form.get('content')
-    new_notice = Notice(title=title, content=content)
-    db.session.add(new_notice)
-    db.session.commit()
-    flash("Notice posted.", "success")
-    return redirect(url_for('noticeboard'))
+# --- DATABASE SEEDING ---
 
-# Database Initialization & Admin Seeding
 with app.app_context():
     db.create_all()
+    
+    # Seed or repair main Admin account
     admin_user = User.query.filter_by(username='Zakaria').first()
     if not admin_user:
         admin = User(
@@ -206,11 +247,15 @@ with app.app_context():
             role='admin'
         )
         db.session.add(admin)
-        db.session.commit()
     else:
-        # Update existing user password hash to guarantee login works
         admin_user.password_hash = generate_password_hash('zakariaprojectmanager1')
-        db.session.commit()
+        
+    # Seed metrics
+    for cat in ['daily', 'weekly', 'monthly', 'yearly']:
+        if not Metric.query.filter_by(category=cat).first():
+            db.session.add(Metric(category=cat, count=0))
+            
+    db.session.commit()
 
 if __name__ == '__main__':
     app.run(debug=True)
