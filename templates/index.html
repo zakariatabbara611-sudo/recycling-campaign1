@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center py-12">
+    <h1 class="text-5xl font-extrabold text-slate-900 mb-4">Save Bottles, Save Tomorrow.</h1>
+    <p class="text-lg text-slate-600 max-w-2xl mx-auto mb-8">Uniting Choueifat Official Secondary School students to collect, recycle, and eliminate plastic waste for a cleaner community.</p>
+</div>
+
+<!-- Stat Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
+        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('daily', 0) }}</h3>
+        <p class="text-sm text-slate-500 font-medium">Today's Bags</p>
+    </div>
+    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
+        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('weekly', 0) }}</h3>
+        <p class="text-sm text-slate-500 font-medium">This Week</p>
+    </div>
+    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
+        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('monthly', 0) }}</h3>
+        <p class="text-sm text-slate-500 font-medium">This Month</p>
+    </div>
+    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
+        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('yearly', 0) }}</h3>
+        <p class="text-sm text-slate-500 font-medium">Year Total</p>
+    </div>
+</div>
+{% endblock %}

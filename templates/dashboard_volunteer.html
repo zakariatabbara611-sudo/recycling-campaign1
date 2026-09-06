@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+{% if tomorrow_alert %}
+<div class="bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 mb-6 rounded-r shadow-sm">
+    <p class="font-bold">⚠️ Upcoming Shift Reminder!</p>
+    <p>You have a shift scheduled. Please check your schedule below and prepare on time!</p>
+</div>
+{% endif %}
+
+<h2 class="text-3xl font-bold mb-6">My Shift Schedule</h2>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <table class="w-full text-left border-collapse">
+        <thead class="bg-emerald-800 text-white">
+            <tr>
+                <th class="p-4">Week</th>
+                <th class="p-4">Day</th>
+                <th class="p-4">Shift</th>
+                <th class="p-4">Status</th>
+                <th class="p-4">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for shift in shifts %}
+            <tr class="border-b">
+                <td class="p-4 font-semibold">Week {{ shift.week_number }}</td>
+                <td class="p-4">{{ shift.day_name }}</td>
+                <td class="p-4">{{ shift.shift_time }}</td>
+                <td class="p-4">
+                    {% if shift.excused %}
+                        <span class="text-red-500 font-bold">Excused</span>
+                    {% else %}
+                        <span class="text-emerald-600 font-bold">Active</span>
+                    {% endif %}
+                </td>
+                <td class="p-4">
+                    {% if not shift.excused %}
+                    <form method="POST" action="/volunteer/excuse/{{ shift.id }}" class="flex gap-2">
+                        <input type="text" name="reason" placeholder="Reason..." class="border p-1 rounded text-sm" required>
+                        <button type="submit" class="bg-red-500 text-white px-3 py-1 rounded text-sm">Submit Excuse</button>
+                    </form>
+                    {% else %}
+                        <span class="text-slate-400 text-sm">{{ shift.excuse_reason }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

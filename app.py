@@ -7,9 +7,9 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.secret_key = "recycling_campaign_super_secret_key"
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Keeps volunteers logged in on phone
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# Database Setup (Supports Render PostgreSQL or local SQLite fallback)
+# Database Setup
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///recycling.db')
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -24,22 +24,22 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
-    role = db.Column(db.String(20), nullable=False)  # 'admin' or 'volunteer'
+    role = db.Column(db.String(20), nullable=False)
     full_name = db.Column(db.String(100), nullable=False)
 
 class Shift(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     volunteer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    week_number = db.Column(db.Integer, nullable=False)  # 1 or 2
-    day_name = db.Column(db.String(20), nullable=False)   # Monday, Tuesday, etc.
-    shift_time = db.Column(db.String(50), nullable=False)  # Morning / Afternoon
+    week_number = db.Column(db.Integer, nullable=False)
+    day_name = db.Column(db.String(20), nullable=False)
+    shift_time = db.Column(db.String(50), nullable=False)
     excused = db.Column(db.Boolean, default=False)
     excuse_reason = db.Column(db.String(255), nullable=True)
     volunteer = db.relationship('User', backref='shifts')
 
 class Metric(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    category = db.Column(db.String(20), unique=True, nullable=False) # 'daily', 'weekly', 'monthly', 'yearly'
+    category = db.Column(db.String(20), unique=True, nullable=False)
     count = db.Column(db.Integer, default=0)
 
 class Notice(db.Model):
@@ -47,19 +47,6 @@ class Notice(db.Model):
     author_name = db.Column(db.String(80), nullable=False)
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-# Seed Initial Admin and Metrics
-def init_db():
-    db.create_all()
-    if not User.query.filter_by(username='Zakaria').first():
-        admin = User(username='Zakaria', password='zakariaprojectmanager1', role='admin', full_name='Zakaria (Project Manager)')
-        db.session.add(admin)
-        
-    for cat in ['daily', 'weekly', 'monthly', 'yearly']:
-        if not Metric.query.filter_by(category=cat).first():
-            db.session.add(Metric(category=cat, count=0))
-            
-    db.session.commit()
 
 # --- ROUTES ---
 
@@ -96,8 +83,6 @@ def logout():
     flash("Logged out successfully.", "success")
     return redirect(url_for('home'))
 
-# --- VOLUNTEER DASHBOARD ---
-
 @app.route('/volunteer/dashboard')
 def volunteer_dashboard():
     if session.get('role') != 'volunteer':
@@ -107,11 +92,7 @@ def volunteer_dashboard():
     user_id = session['user_id']
     shifts = Shift.query.filter_by(volunteer_id=user_id).all()
     
-    # Check if a shift is scheduled for tomorrow for pop-up alert
-    tomorrow_alert = False
-    for s in shifts:
-        if not s.excused:
-            tomorrow_alert = True
+    tomorrow_alert = any(not s.excused for s in shifts)
             
     return render_template('dashboard_volunteer.html', shifts=shifts, tomorrow_alert=tomorrow_alert)
 
@@ -128,8 +109,6 @@ def submit_excuse(shift_id):
         flash("Excuse submitted to management.", "success")
         
     return redirect(url_for('volunteer_dashboard'))
-
-# --- ADMIN DASHBOARD ---
 
 @app.route('/admin/dashboard', methods=['GET', 'POST'])
 def admin_dashboard():
@@ -189,7 +168,7 @@ def update_metrics():
         
     for cat in ['daily', 'weekly', 'monthly', 'yearly']:
         val = request.form.get(cat)
-        if val is not None:
+        if val is not None and val.isdigit():
             m = Metric.query.filter_by(category=cat).first()
             if m:
                 m.count = int(val)
@@ -197,8 +176,6 @@ def update_metrics():
     db.session.commit()
     flash("Bottle collection metrics updated!", "success")
     return redirect(url_for('admin_dashboard'))
-
-# --- NOTICEBOARD ---
 
 @app.route('/noticeboard', methods=['GET', 'POST'])
 def noticeboard():
@@ -217,8 +194,18 @@ def noticeboard():
     notices = Notice.query.order_by(Notice.created_at.desc()).all()
     return render_template('noticeboard.html', notices=notices)
 
+# Initialization inside app context
 with app.app_context():
-    init_db()
+    db.create_all()
+    if not User.query.filter_by(username='Zakaria').first():
+        admin = User(username='Zakaria', password='zakariaprojectmanager1', role='admin', full_name='Zakaria (Project Manager)')
+        db.session.add(admin)
+        
+    for cat in ['daily', 'weekly', 'monthly', 'yearly']:
+        if not Metric.query.filter_by(category=cat).first():
+            db.session.add(Metric(category=cat, count=0))
+            
+    db.session.commit()
 
 if __name__ == '__main__':
     app.run(debug=True)

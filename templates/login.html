@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-md border border-slate-100 my-12">
+    <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">Campaign Login</h2>
+    <form method="POST">
+        <div class="mb-4">
+            <label class="block text-sm font-semibold mb-2">Username</label>
+            <input type="text" name="username" class="w-full border p-3 rounded-lg focus:outline-emerald-600" required>
+        </div>
+        <div class="mb-6">
+            <label class="block text-sm font-semibold mb-2">Password</label>
+            <input type="password" name="password" class="w-full border p-3 rounded-lg focus:outline-emerald-600" required>
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">Sign In</button>
+    </form>
+</div>
+{% endblock %}

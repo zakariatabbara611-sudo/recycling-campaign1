@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-3xl font-bold mb-8">Manager Control Center</h2>
+
+<div class="grid md:grid-cols-2 gap-8 mb-12">
+    <!-- Add Volunteer / Manager -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <h3 class="text-xl font-bold mb-4">Add Volunteer or Manager</h3>
+        <form method="POST" action="/admin/add_user">
+            <input type="text" name="username" placeholder="Username" class="w-full border p-2 mb-3 rounded" required>
+            <input type="text" name="full_name" placeholder="Full Name" class="w-full border p-2 mb-3 rounded" required>
+            <select name="role" class="w-full border p-2 mb-4 rounded">
+                <option value="volunteer">Volunteer</option>
+                <option value="admin">Manager</option>
+            </select>
+            <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded font-bold w-full">Create Account</button>
+        </form>
+    </div>
+
+    <!-- Assign Shift -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <h3 class="text-xl font-bold mb-4">Assign Shift</h3>
+        <form method="POST" action="/admin/add_shift">
+            <select name="volunteer_id" class="w-full border p-2 mb-3 rounded">
+                {% for v in volunteers %}
+                    <option value="{{ v.id }}">{{ v.full_name }} ({{ v.username }})</option>
+                {% endfor %}
+            </select>
+            <select name="week_number" class="w-full border p-2 mb-3 rounded">
+                <option value="1">Week 1</option>
+                <option value="2">Week 2</option>
+            </select>
+            <input type="text" name="day_name" placeholder="Day (e.g. Monday)" class="w-full border p-2 mb-3 rounded" required>
+            <input type="text" name="shift_time" placeholder="Shift (e.g. Morning)" class="w-full border p-2 mb-4 rounded" required>
+            <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded font-bold w-full">Assign Shift</button>
+        </form>
+    </div>
+</div>
+
+<!-- Update Bottle Counts -->
+<div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-12">
+    <h3 class="text-xl font-bold mb-4">Update Bottle Collection Metrics</h3>
+    <form method="POST" action="/admin/update_metrics" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+            <label class="block text-xs font-bold mb-1">Daily Bags</label>
+            <input type="number" name="daily" value="{{ metrics.daily.count }}" class="border p-2 rounded w-full">
+        </div>
+        <div>
+            <label class="block text-xs font-bold mb-1">Weekly Bags</label>
+            <input type="number" name="weekly" value="{{ metrics.weekly.count }}" class="border p-2 rounded w-full">
+        </div>
+        <div>
+            <label class="block text-xs font-bold mb-1">Monthly Bags</label>
+            <input type="number" name="monthly" value="{{ metrics.monthly.count }}" class="border p-2 rounded w-full">
+        </div>
+        <div>
+            <label class="block text-xs font-bold mb-1">Yearly Bags</label>
+            <input type="number" name="yearly" value="{{ metrics.yearly.count }}" class="border p-2 rounded w-full">
+        </div>
+        <button type="submit" class="col-span-2 md:col-span-4 bg-emerald-700 text-white py-2 rounded font-bold mt-2">Save All Metrics</button>
+    </form>
+</div>
+{% endblock %}

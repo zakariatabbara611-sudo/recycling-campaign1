@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choueifat Secondary School - Plastic Recycling</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-emerald-50 text-slate-800 flex flex-col min-h-screen">
+
+    <nav class="bg-white shadow-md py-4 px-8 flex justify-between items-center">
+        <a href="/" class="text-2xl font-bold text-emerald-700">🌱 EcoChoueifat</a>
+        <div class="space-x-6">
+            <a href="/" class="hover:text-emerald-600 font-medium">Home</a>
+            {% if session.get('user_id') %}
+                <a href="/noticeboard" class="hover:text-emerald-600 font-medium">Noticeboard</a>
+                {% if session.get('role') == 'admin' %}
+                    <a href="/admin/dashboard" class="text-emerald-700 font-bold">Manager Portal</a>
+                {% else %}
+                    <a href="/volunteer/dashboard" class="text-emerald-700 font-bold">My Shifts</a>
+                {% endif %}
+                <a href="/logout" class="bg-red-500 text-white px-4 py-2 rounded-lg font-medium">Logout</a>
+            {% else %}
+                <a href="/login" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-medium">Portal Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto w-full p-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-4 mb-4 rounded-lg text-white {% if category == 'error' %}bg-red-500{% else %}bg-emerald-600{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <main class="flex-grow max-w-6xl mx-auto w-full px-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-emerald-900 text-emerald-100 py-6 text-center mt-12">
+        <p>© Choueifat Official Secondary School - Plastic Recycling Campaign</p>
+    </footer>
+</body>
+</html>
