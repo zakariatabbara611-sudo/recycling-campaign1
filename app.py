@@ -21,7 +21,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- EMAIL HELPER (Standard SMTP) ---
+# --- EMAIL HELPER ---
 MAIL_SERVER = 'smtp.gmail.com'
 MAIL_PORT = 587
 MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
@@ -91,33 +91,42 @@ class Notice(db.Model):
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# --- HELPER FUNCTION FOR ABSENCES ---
 def get_unexcused_absences(user_id):
     return Shift.query.filter_by(user_id=user_id, attended=False, excused=False).count()
 
-# --- DATABASE SCHEMA SAFETY MIGRATION ---
+# --- COMPLETE AUTO MIGRATION ---
 def auto_migrate_db():
     db.create_all()
+    
+    # Columns to check for User table
+    user_cols = [
+        ("assigned_day", "VARCHAR(20)"),
+        ("submanager_job_done", "BOOLEAN DEFAULT FALSE"),
+        ("email", "VARCHAR(120)")
+    ]
+    
+    # Columns to check for Shift table
+    shift_cols = [
+        ("excused", "BOOLEAN DEFAULT FALSE"),
+        ("excuse_reason", "VARCHAR(255)"),
+        ("attended", "BOOLEAN DEFAULT FALSE"),
+        ("volunteer_job_done", "BOOLEAN DEFAULT FALSE")
+    ]
+
     with db.engine.connect() as conn:
-        # PostgreSQL column addition if missing
-        cols_to_add = [
-            ("assigned_day", "VARCHAR(20)"),
-            ("submanager_job_done", "BOOLEAN DEFAULT FALSE"),
-            ("email", "VARCHAR(120)")
-        ]
-        for col, col_type in cols_to_add:
+        for col, col_type in user_cols:
             try:
                 conn.execute(text(f'ALTER TABLE "user" ADD COLUMN {col} {col_type};'))
                 conn.commit()
             except Exception:
-                # Column already exists or dialect is SQLite
                 pass
 
-        try:
-            conn.execute(text('ALTER TABLE shift ADD COLUMN volunteer_job_done BOOLEAN DEFAULT FALSE;'))
-            conn.commit()
-        except Exception:
-            pass
+        for col, col_type in shift_cols:
+            try:
+                conn.execute(text(f'ALTER TABLE shift ADD COLUMN {col} {col_type};'))
+                conn.commit()
+            except Exception:
+                pass
 
 # --- ROUTES ---
 
@@ -154,8 +163,6 @@ def logout():
     session.clear()
     flash("Successfully logged out.", "success")
     return redirect(url_for('home'))
-
-# --- PRIMARY MANAGER DASHBOARD ---
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
@@ -241,8 +248,6 @@ def delete_shift(shift_id):
     flash("Shift removed.", "success")
     return redirect(url_for('admin_dashboard'))
 
-# --- SUB-MANAGER DASHBOARD ---
-
 @app.route('/submanager/dashboard')
 def submanager_dashboard():
     if session.get('role') != 'sub_manager':
@@ -293,8 +298,6 @@ def submanager_complete_job():
     flash("Daily management job status updated.", "success")
     return redirect(url_for('submanager_dashboard'))
 
-# --- VOLUNTEER DASHBOARD ---
-
 @app.route('/volunteer/dashboard')
 def volunteer_dashboard():
     if not session.get('user_id'):
@@ -326,8 +329,6 @@ def submit_excuse(shift_id):
         flash("Excuse submitted to management.", "success")
     return redirect(url_for('volunteer_dashboard'))
 
-# --- NOTICEBOARD ---
-
 @app.route('/noticeboard', methods=['GET', 'POST'])
 def noticeboard():
     if 'user_id' not in session:
@@ -344,8 +345,6 @@ def noticeboard():
             
     notices = Notice.query.order_by(Notice.created_at.desc()).all()
     return render_template('noticeboard.html', notices=notices)
-
-# --- AUTOMATED CRON ENDPOINT ---
 
 @app.route('/api/cron/send-reminders', methods=['GET', 'POST'])
 def automated_daily_reminders():
@@ -370,7 +369,6 @@ def automated_daily_reminders():
 with app.app_context():
     auto_migrate_db()
     
-    # Ensure admin user exists without crashing on duplicates
     admin = User.query.filter_by(username='Zakaria').first()
     if not admin:
         admin = User(
@@ -381,7 +379,6 @@ with app.app_context():
         )
         db.session.add(admin)
 
-    # Ensure metrics exist
     for cat in ['daily', 'weekly', 'monthly', 'yearly']:
         if not Metric.query.filter_by(category=cat).first():
             db.session.add(Metric(category=cat, count=0))
