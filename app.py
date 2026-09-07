@@ -1,8 +1,10 @@
 import os
+import smtplib
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -18,15 +20,32 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- EMAIL CONFIGURATION (SMTP) ---
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+# --- EMAIL HELPER (Standard SMTP) ---
+MAIL_SERVER = 'smtp.gmail.com'
+MAIL_PORT = 587
+MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
 
-mail = Mail(app)
+def send_email_notification(to_email, subject, body):
+    if not MAIL_USERNAME or not MAIL_PASSWORD:
+        print("Email credentials not configured.")
+        return False
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = MAIL_USERNAME
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT)
+        server.starttls()
+        server.login(MAIL_USERNAME, MAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
 
 # --- DATABASE MODELS ---
 
@@ -73,7 +92,6 @@ class Notice(db.Model):
 
 # --- HELPER FUNCTION FOR ABSENCES ---
 def get_unexcused_absences(user_id):
-    # Counts shifts where attendance was NOT marked and no excuse was provided
     return Shift.query.filter_by(user_id=user_id, attended=False, excused=False).count()
 
 # --- ROUTES ---
@@ -124,7 +142,6 @@ def admin_dashboard():
     sub_managers = User.query.filter_by(role='sub_manager').all()
     shifts = Shift.query.all()
     
-    # Calculate absences per volunteer
     absence_data = {v.id: get_unexcused_absences(v.id) for v in volunteers}
     
     return render_template('dashboard_admin.html', volunteers=volunteers, sub_managers=sub_managers, shifts=shifts, absence_data=absence_data)
@@ -208,7 +225,6 @@ def submanager_dashboard():
         return redirect(url_for('login'))
         
     submanager = User.query.get(session['user_id'])
-    # Query shifts for the sub-manager's assigned day
     assigned_shifts = Shift.query.filter_by(day_name=submanager.assigned_day).all()
     volunteers = User.query.filter_by(role='volunteer').all()
     
@@ -317,16 +333,10 @@ def automated_daily_reminders():
     for shift in upcoming_shifts:
         volunteer = shift.volunteer
         if volunteer and volunteer.email:
-            try:
-                msg = Message(
-                    subject="[FARZI] Reminder: Your Recycling Shift is Tomorrow!",
-                    recipients=[volunteer.email],
-                    body=f"Hi {volunteer.full_name},\n\nThis is a reminder that you have a FARZI recycling shift tomorrow ({shift.day_name}):\n\n- Time: {shift.shift_time}\n- Week: {shift.week_number}\n\nThank you for supporting our school campaign!\n- FARZI Management"
-                )
-                mail.send(msg)
+            subject = "[FARZI] Reminder: Your Recycling Shift is Tomorrow!"
+            body = f"Hi {volunteer.full_name},\n\nThis is a reminder that you have a FARZI recycling shift tomorrow ({shift.day_name}):\n\n- Time: {shift.shift_time}\n- Week: {shift.week_number}\n\nThank you for supporting our school campaign!\n- FARZI Management"
+            if send_email_notification(volunteer.email, subject, body):
                 sent_count += 1
-            except Exception as e:
-                print(f"Failed sending email: {e}")
                 
     return jsonify({"status": "success", "day_checked": tomorrow_day, "emails_sent": sent_count}), 200
 
@@ -335,7 +345,6 @@ def automated_daily_reminders():
 with app.app_context():
     db.create_all()
     
-    # Ensure primary admin account exists
     admin_user = User.query.filter_by(username='Zakaria').first()
     if not admin_user:
         admin = User(
@@ -348,7 +357,6 @@ with app.app_context():
     else:
         admin_user.password_hash = generate_password_hash('zakariaprojectmanager1')
 
-    # Seed metric entries
     for cat in ['daily', 'weekly', 'monthly', 'yearly']:
         if not Metric.query.filter_by(category=cat).first():
             db.session.add(Metric(category=cat, count=0))
