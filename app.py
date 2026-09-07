@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -20,33 +20,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-
-# --- DIRECT SCHEMA MIGRATION (Runs before ORM queries) ---
-def run_schema_updates(database_uri):
-    """Executes raw ALTER TABLE statements directly on the engine before SQLAlchemy initializes queries."""
-    try:
-        engine = create_engine(database_uri)
-        columns_to_add = [
-            ('user', 'email', 'VARCHAR(120)'),
-            ('user', 'role', "VARCHAR(20) DEFAULT 'volunteer'"),
-            ('user', 'assigned_day', 'VARCHAR(20)'),
-            ('user', 'submanager_job_done', 'BOOLEAN DEFAULT FALSE'),
-            ('shift', 'attended', 'BOOLEAN DEFAULT FALSE'),
-            ('shift', 'volunteer_job_done', 'BOOLEAN DEFAULT FALSE'),
-        ]
-        with engine.connect() as conn:
-            for table, column, col_type in columns_to_add:
-                try:
-                    conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {column} {col_type};'))
-                    conn.commit()
-                except Exception:
-                    pass  # Column already exists
-        engine.dispose()
-    except Exception as e:
-        print(f"Schema update skipped/failed: {e}")
-
-# Run schema updates immediately upon app startup
-run_schema_updates(db_url)
 
 # --- EMAIL HELPER (Standard SMTP) ---
 MAIL_SERVER = 'smtp.gmail.com'
@@ -121,6 +94,30 @@ class Notice(db.Model):
 # --- HELPER FUNCTION FOR ABSENCES ---
 def get_unexcused_absences(user_id):
     return Shift.query.filter_by(user_id=user_id, attended=False, excused=False).count()
+
+# --- DATABASE SCHEMA SAFETY MIGRATION ---
+def auto_migrate_db():
+    db.create_all()
+    with db.engine.connect() as conn:
+        # PostgreSQL column addition if missing
+        cols_to_add = [
+            ("assigned_day", "VARCHAR(20)"),
+            ("submanager_job_done", "BOOLEAN DEFAULT FALSE"),
+            ("email", "VARCHAR(120)")
+        ]
+        for col, col_type in cols_to_add:
+            try:
+                conn.execute(text(f'ALTER TABLE "user" ADD COLUMN {col} {col_type};'))
+                conn.commit()
+            except Exception:
+                # Column already exists or dialect is SQLite
+                pass
+
+        try:
+            conn.execute(text('ALTER TABLE shift ADD COLUMN volunteer_job_done BOOLEAN DEFAULT FALSE;'))
+            conn.commit()
+        except Exception:
+            pass
 
 # --- ROUTES ---
 
@@ -368,13 +365,14 @@ def automated_daily_reminders():
                 
     return jsonify({"status": "success", "day_checked": tomorrow_day, "emails_sent": sent_count}), 200
 
-# --- INITIALIZATION ---
+# --- SAFE INITIALIZATION & SEEDING ---
 
 with app.app_context():
-    db.create_all()
+    auto_migrate_db()
     
-    admin_user = User.query.filter_by(username='Zakaria').first()
-    if not admin_user:
+    # Ensure admin user exists without crashing on duplicates
+    admin = User.query.filter_by(username='Zakaria').first()
+    if not admin:
         admin = User(
             username='Zakaria',
             full_name='Zakaria (Project Manager)',
@@ -382,9 +380,8 @@ with app.app_context():
             role='admin'
         )
         db.session.add(admin)
-    else:
-        admin_user.password_hash = generate_password_hash('zakariaprojectmanager1')
 
+    # Ensure metrics exist
     for cat in ['daily', 'weekly', 'monthly', 'yearly']:
         if not Metric.query.filter_by(category=cat).first():
             db.session.add(Metric(category=cat, count=0))
