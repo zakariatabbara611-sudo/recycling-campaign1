@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -20,6 +20,33 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# --- DIRECT SCHEMA MIGRATION (Runs before ORM queries) ---
+def run_schema_updates(database_uri):
+    """Executes raw ALTER TABLE statements directly on the engine before SQLAlchemy initializes queries."""
+    try:
+        engine = create_engine(database_uri)
+        columns_to_add = [
+            ('user', 'email', 'VARCHAR(120)'),
+            ('user', 'role', "VARCHAR(20) DEFAULT 'volunteer'"),
+            ('user', 'assigned_day', 'VARCHAR(20)'),
+            ('user', 'submanager_job_done', 'BOOLEAN DEFAULT FALSE'),
+            ('shift', 'attended', 'BOOLEAN DEFAULT FALSE'),
+            ('shift', 'volunteer_job_done', 'BOOLEAN DEFAULT FALSE'),
+        ]
+        with engine.connect() as conn:
+            for table, column, col_type in columns_to_add:
+                try:
+                    conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {column} {col_type};'))
+                    conn.commit()
+                except Exception:
+                    pass  # Column already exists
+        engine.dispose()
+    except Exception as e:
+        print(f"Schema update skipped/failed: {e}")
+
+# Run schema updates immediately upon app startup
+run_schema_updates(db_url)
 
 # --- EMAIL HELPER (Standard SMTP) ---
 MAIL_SERVER = 'smtp.gmail.com'
@@ -56,8 +83,8 @@ class User(db.Model):
     full_name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), default='volunteer')  # 'admin', 'sub_manager', or 'volunteer'
-    assigned_day = db.Column(db.String(20), nullable=True)  # For Sub-Managers
+    role = db.Column(db.String(20), default='volunteer')
+    assigned_day = db.Column(db.String(20), nullable=True)
     submanager_job_done = db.Column(db.Boolean, default=False)
     shifts = db.relationship('Shift', backref='volunteer', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Feedback', backref='volunteer', lazy=True, cascade='all, delete-orphan')
@@ -341,30 +368,10 @@ def automated_daily_reminders():
                 
     return jsonify({"status": "success", "day_checked": tomorrow_day, "emails_sent": sent_count}), 200
 
-# --- DATABASE INITIALIZATION & AUTO-MIGRATION ---
-
-def apply_auto_migrations():
-    """Safely adds missing columns to existing PostgreSQL tables."""
-    columns_to_add = [
-        ('user', 'email', 'VARCHAR(120)'),
-        ('user', 'role', "VARCHAR(20) DEFAULT 'volunteer'"),
-        ('user', 'assigned_day', 'VARCHAR(20)'),
-        ('user', 'submanager_job_done', 'BOOLEAN DEFAULT FALSE'),
-        ('shift', 'attended', 'BOOLEAN DEFAULT FALSE'),
-        ('shift', 'volunteer_job_done', 'BOOLEAN DEFAULT FALSE'),
-    ]
-    with db.engine.connect() as conn:
-        for table, column, col_type in columns_to_add:
-            try:
-                conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {column} {col_type};'))
-                conn.commit()
-            except Exception:
-                # Column already exists, ignore error
-                pass
+# --- INITIALIZATION ---
 
 with app.app_context():
     db.create_all()
-    apply_auto_migrations()
     
     admin_user = User.query.filter_by(username='Zakaria').first()
     if not admin_user:
