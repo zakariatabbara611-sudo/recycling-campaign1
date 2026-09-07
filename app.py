@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -56,7 +57,7 @@ class User(db.Model):
     email = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='volunteer')  # 'admin', 'sub_manager', or 'volunteer'
-    assigned_day = db.Column(db.String(20), nullable=True)  # For Sub-Managers (e.g., 'Monday')
+    assigned_day = db.Column(db.String(20), nullable=True)  # For Sub-Managers
     submanager_job_done = db.Column(db.Boolean, default=False)
     shifts = db.relationship('Shift', backref='volunteer', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Feedback', backref='volunteer', lazy=True, cascade='all, delete-orphan')
@@ -69,8 +70,8 @@ class Shift(db.Model):
     shift_time = db.Column(db.String(50), nullable=False)
     excused = db.Column(db.Boolean, default=False)
     excuse_reason = db.Column(db.String(255), nullable=True)
-    attended = db.Column(db.Boolean, default=False)  # Sub-Manager Attendance Checkbox
-    volunteer_job_done = db.Column(db.Boolean, default=False)  # Volunteer Completion Checkbox
+    attended = db.Column(db.Boolean, default=False)
+    volunteer_job_done = db.Column(db.Boolean, default=False)
 
 class Feedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -340,10 +341,30 @@ def automated_daily_reminders():
                 
     return jsonify({"status": "success", "day_checked": tomorrow_day, "emails_sent": sent_count}), 200
 
-# --- DATABASE INITIALIZATION ---
+# --- DATABASE INITIALIZATION & AUTO-MIGRATION ---
+
+def apply_auto_migrations():
+    """Safely adds missing columns to existing PostgreSQL tables."""
+    columns_to_add = [
+        ('user', 'email', 'VARCHAR(120)'),
+        ('user', 'role', "VARCHAR(20) DEFAULT 'volunteer'"),
+        ('user', 'assigned_day', 'VARCHAR(20)'),
+        ('user', 'submanager_job_done', 'BOOLEAN DEFAULT FALSE'),
+        ('shift', 'attended', 'BOOLEAN DEFAULT FALSE'),
+        ('shift', 'volunteer_job_done', 'BOOLEAN DEFAULT FALSE'),
+    ]
+    with db.engine.connect() as conn:
+        for table, column, col_type in columns_to_add:
+            try:
+                conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {column} {col_type};'))
+                conn.commit()
+            except Exception:
+                # Column already exists, ignore error
+                pass
 
 with app.app_context():
     db.create_all()
+    apply_auto_migrations()
     
     admin_user = User.query.filter_by(username='Zakaria').first()
     if not admin_user:
