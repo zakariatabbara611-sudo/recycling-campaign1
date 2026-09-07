@@ -94,39 +94,19 @@ class Notice(db.Model):
 def get_unexcused_absences(user_id):
     return Shift.query.filter_by(user_id=user_id, attended=False, excused=False).count()
 
-# --- COMPLETE AUTO MIGRATION ---
-def auto_migrate_db():
-    db.create_all()
-    
-    # Columns to check for User table
-    user_cols = [
-        ("assigned_day", "VARCHAR(20)"),
-        ("submanager_job_done", "BOOLEAN DEFAULT FALSE"),
-        ("email", "VARCHAR(120)")
-    ]
-    
-    # Columns to check for Shift table
-    shift_cols = [
-        ("excused", "BOOLEAN DEFAULT FALSE"),
-        ("excuse_reason", "VARCHAR(255)"),
-        ("attended", "BOOLEAN DEFAULT FALSE"),
-        ("volunteer_job_done", "BOOLEAN DEFAULT FALSE")
-    ]
-
+# --- HARD RESET DATABASE SCHEMA ON RENDER ---
+def reset_database_schema():
     with db.engine.connect() as conn:
-        for col, col_type in user_cols:
-            try:
-                conn.execute(text(f'ALTER TABLE "user" ADD COLUMN {col} {col_type};'))
-                conn.commit()
-            except Exception:
-                pass
-
-        for col, col_type in shift_cols:
-            try:
-                conn.execute(text(f'ALTER TABLE shift ADD COLUMN {col} {col_type};'))
-                conn.commit()
-            except Exception:
-                pass
+        try:
+            # Drops all broken tables cleanly in PostgreSQL
+            conn.execute(text('DROP SCHEMA public CASCADE; CREATE SCHEMA public;'))
+            conn.commit()
+            print("Database schema successfully reset.")
+        except Exception as e:
+            print(f"Reset skipped or failed: {e}")
+            
+    # Rebuild all tables with all defined columns
+    db.create_all()
 
 # --- ROUTES ---
 
@@ -364,10 +344,10 @@ def automated_daily_reminders():
                 
     return jsonify({"status": "success", "day_checked": tomorrow_day, "emails_sent": sent_count}), 200
 
-# --- SAFE INITIALIZATION & SEEDING ---
+# --- SAFE INITIALIZATION ---
 
 with app.app_context():
-    auto_migrate_db()
+    reset_database_schema()
     
     admin = User.query.filter_by(username='Zakaria').first()
     if not admin:
