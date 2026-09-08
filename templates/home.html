@@ -1,74 +1,119 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<div class="container py-5">
-  <div class="text-center mb-5">
-    <h1 class="display-4 fw-bold text-success">FARZI Recycling Campaign</h1>
-    <p class="lead text-muted">Official Secondary School Environmental & Waste Reduction Management Platform</p>
-  </div>
-
-  <!-- LIVE ENVIRONMENTAL IMPACT COUNTER -->
-  <div class="row g-4 mb-5 text-center">
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 bg-success text-white p-3">
-        <h3 class="display-6 fw-bold">{{ total_bottles }}</h3>
-        <p class="mb-0">Total Bottles Recycled</p>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 bg-primary text-white p-3">
-        <h3 class="display-6 fw-bold">{{ total_weight }} kg</h3>
-        <p class="mb-0">Plastic Waste Diverted</p>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 bg-dark text-white p-3">
-        <h3 class="display-6 fw-bold">{{ co2_saved_kg }} kg</h3>
-        <p class="mb-0">Estimated CO₂ Offset</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- LEADERBOARD & USER DIRECTORY -->
-  <div class="row g-4">
-    <!-- TOP VOLUNTEERS LEADERBOARD -->
-    <div class="col-md-6">
-      <div class="card shadow-sm h-100">
-        <div class="card-header bg-warning text-dark fw-bold">
-          🏆 Top Recycler Leaderboard
-        </div>
-        <div class="card-body p-0">
-          <ul class="list-group list-group-flush">
-            {% for top in leaderboard %}
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span><strong>#{{ loop.index }}</strong> {{ top.full_name }}</span>
-                <span class="badge bg-warning text-dark fs-6">⭐ {{ top.points }} pts</span>
-              </li>
+<div class="row align-items-center mb-5 hero-section">
+    <div class="col-lg-7">
+        <h1 class="display-4 fw-bold text-success mb-3">Recycling Impact Tracker</h1>
+        <p class="lead text-muted">Together, our school community is making a measurable difference. Track live recycling progress, volunteer contributions, and environmental savings in real-time.</p>
+        <div class="mt-4">
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('noticeboard') }}" class="btn btn-success btn-lg me-2 shadow-sm">View Noticeboard</a>
             {% else %}
-              <li class="list-group-item text-muted text-center py-3">No points awarded yet.</li>
-            {% endfor %}
-          </ul>
+                <a href="{{ url_for('login') }}" class="btn btn-success btn-lg me-2 shadow-sm">Volunteer Portal Login</a>
+            {% endif %}
         </div>
-      </div>
+    </div>
+    <div class="col-lg-5 text-center mt-4 mt-lg-0">
+        <div class="card border-0 shadow-lg p-4 bg-light rounded-4">
+            <h4 class="fw-bold text-success mb-3">Live Impact Metrics</h4>
+            <div class="row g-3">
+                <div class="col-6">
+                    <div class="p-3 bg-white rounded-3 shadow-sm">
+                        <h2 class="fw-bold text-dark mb-0">{{ total_bottles }}</h2>
+                        <small class="text-muted fw-semibold">Bottles Recycled</small>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-white rounded-3 shadow-sm">
+                        <h2 class="fw-bold text-dark mb-0">{{ total_weight }} <span class="fs-6">kg</span></h2>
+                        <small class="text-muted fw-semibold">Plastic Weight</small>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="p-3 bg-success text-white rounded-3 shadow-sm">
+                        <h2 class="fw-bold mb-0">{{ co2_saved_kg }} <span class="fs-6">kg</span></h2>
+                        <small class="fw-semibold">Estimated CO₂ Offset</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr class="my-5">
+
+<!-- LEADERBOARD SECTION -->
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h4 class="fw-bold text-success mb-0">🏆 Top Volunteers</h4>
+            </div>
+            <div class="card-body px-4">
+                {% if leaderboard %}
+                    <div class="list-group list-group-flush">
+                        {% for user in leaderboard %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center border-0 px-0 py-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="badge bg-light text-dark rounded-circle me-3 p-2 fw-bold" style="width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;">
+                                        #{{ loop.index }}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold">{{ user.full_name }}</h6>
+                                        <small class="text-muted">@{{ user.username }}</small>
+                                    </div>
+                                </div>
+                                <span class="badge bg-success rounded-pill px-3 py-2 fs-6">{{ user.points or 0 }} pts</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted my-3">No volunteer points recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
-    <!-- CAMPAIGN VOLUNTEER LIST -->
-    <div class="col-md-6">
-      <div class="card shadow-sm h-100">
-        <div class="card-header bg-dark text-white fw-bold">
-          👥 Active Team Members
+    <!-- COMMUNITY ROSTER SECTION -->
+    <div class="col-lg-6 mb-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h4 class="fw-bold text-dark mb-0">👥 Campaign Team</h4>
+            </div>
+            <div class="card-body px-4">
+                {% if users %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Role</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for u in users %}
+                                    <tr>
+                                        <td>
+                                            <strong class="text-dark">{{ u.full_name }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if u.role == 'admin' %}
+                                                <span class="badge bg-danger">Admin</span>
+                                            {% elif u.role == 'sub_manager' %}
+                                                <span class="badge bg-warning text-dark">Sub-Manager</span>
+                                            {% else %}
+                                                <span class="badge bg-info text-dark">Volunteer</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted my-3">No team members logged yet.</p>
+                {% endif %}
+            </div>
         </div>
-        <div class="card-body p-0">
-          <ul class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
-            {% for u in users %}
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span>{{ u.full_name }}</span>
-                <span class="badge bg-secondary">{{ u.role }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      </div>
     </div>
-  </div>
 </div>
-{% endblock %}
