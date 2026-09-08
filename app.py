@@ -47,7 +47,7 @@ class Shift(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     volunteer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     week_number = db.Column(db.Integer, nullable=False, default=1)
-    day_name = db.Column(db.String(20), nullable=False)
+    day_name = db.Column(db.String(50), nullable=False)
     shift_time = db.Column(db.String(50), nullable=False, default='12:00 PM - 12:30 PM')
     attended = db.Column(db.Boolean, default=False)
     volunteer_job_done = db.Column(db.Boolean, default=False)
@@ -494,20 +494,33 @@ def noticeboard():
 
 
 # ---------------------------------------------------------------------------
-# DATABASE INITIALIZATION & MIGRATIONS
+# DATABASE INITIALIZATION & AUTO-MIGRATIONS
 # ---------------------------------------------------------------------------
 
 with app.app_context():
     db.create_all()
 
-    try:
-        db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;'))
-        db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS submanager_job_done BOOLEAN DEFAULT FALSE;'))
-        db.session.execute(text('UPDATE "user" SET points = 0 WHERE points IS NULL;'))
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        print(f"Migration Note: {e}")
+    # Dynamic migrations for existing PostgreSQL tables
+    migrations = [
+        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;',
+        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS submanager_job_done BOOLEAN DEFAULT FALSE;',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS volunteer_id INTEGER REFERENCES "user"(id);',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS week_number INTEGER DEFAULT 1;',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS day_name VARCHAR(50);',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS shift_time VARCHAR(50) DEFAULT \'12:00 PM - 12:30 PM\';',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE;',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS volunteer_job_done BOOLEAN DEFAULT FALSE;',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excused BOOLEAN DEFAULT FALSE;',
+        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excuse_reason TEXT;',
+        'UPDATE "user" SET points = 0 WHERE points IS NULL;'
+    ]
+
+    for statement in migrations:
+        try:
+            db.session.execute(text(statement))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
 
     admin = User.query.filter_by(username='Zakaria').first()
     if not admin:
