@@ -1,17 +1,36 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
+
 {% block content %}
-<div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-md border border-slate-100 my-12">
-    <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">Campaign Login</h2>
-    <form method="POST">
-        <div class="mb-4">
-            <label class="block text-sm font-semibold mb-2">Username</label>
-            <input type="text" name="username" class="w-full border p-3 rounded-lg focus:outline-emerald-600" required>
+<div class="row justify-content-center my-5">
+    <div class="col-md-5">
+        <div class="card border-0 shadow-lg rounded-4 p-4">
+            <div class="card-body">
+                <h3 class="fw-bold text-center text-success mb-4">Portal Login</h3>
+                
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form action="{{ url_for('login') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label fw-semibold">Username</label>
+                        <input type="text" class="form-control form-control-lg" id="username" name="username" required autocomplete="username">
+                    </div>
+                    <div class="mb-4">
+                        <label for="password" class="form-label fw-semibold">Password</label>
+                        <input type="password" class="form-control form-control-lg" id="password" name="password" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn btn-success btn-lg w-100 shadow-sm fw-bold">Sign In</button>
+                </form>
+            </div>
         </div>
-        <div class="mb-6">
-            <label class="block text-sm font-semibold mb-2">Password</label>
-            <input type="password" name="password" class="w-full border p-3 rounded-lg focus:outline-emerald-600" required>
-        </div>
-        <button type="submit" class="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">Sign In</button>
-    </form>
+    </div>
 </div>
 {% endblock %}

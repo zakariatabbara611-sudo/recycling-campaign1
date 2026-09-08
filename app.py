@@ -28,8 +28,8 @@ class User(db.Model):
     full_name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='volunteer')  # admin, sub_manager, volunteer
-    assigned_day = db.Column(db.String(20), nullable=True)  # Monday, Tuesday, Wednesday, Thursday
+    role = db.Column(db.String(20), nullable=False, default='volunteer')
+    assigned_day = db.Column(db.String(20), nullable=True)
     submanager_job_done = db.Column(db.Boolean, default=False)
     points = db.Column(db.Integer, default=0)
 
@@ -84,8 +84,11 @@ class Notice(db.Model):
 @app.context_processor
 def inject_notifications():
     if session.get('user_id'):
-        notifications = Notice.query.order_by(Notice.created_at.desc()).limit(5).all()
-        return dict(notifications=notifications, unread_count=len(notifications))
+        try:
+            notifications = Notice.query.order_by(Notice.created_at.desc()).limit(5).all()
+            return dict(notifications=notifications, unread_count=len(notifications))
+        except Exception:
+            return dict(notifications=[], unread_count=0)
     return dict(notifications=[], unread_count=0)
 
 
@@ -115,8 +118,12 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if not username or not password:
+            flash("Please fill in both username and password.", "error")
+            return render_template('login.html')
 
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
@@ -318,7 +325,7 @@ def submanager_dashboard():
         return redirect(url_for('login'))
 
     submanager = User.query.get(session['user_id'])
-    shifts = Shift.query.filter_by(day_name=submanager.assigned_day).all()
+    shifts = Shift.query.filter_by(day_name=submanager.assigned_day).all() if submanager else []
     volunteers = User.query.filter_by(role='volunteer').all()
 
     absence_data = {}
@@ -341,8 +348,9 @@ def submanager_complete_job():
         return redirect(url_for('login'))
 
     submanager = User.query.get(session['user_id'])
-    submanager.submanager_job_done = not submanager.submanager_job_done
-    db.session.commit()
+    if submanager:
+        submanager.submanager_job_done = not submanager.submanager_job_done
+        db.session.commit()
 
     flash("Supervision status updated.", "success")
     return redirect(url_for('submanager_dashboard'))
@@ -415,9 +423,9 @@ def volunteer_dashboard():
         return redirect(url_for('login'))
 
     user = User.query.get(session['user_id'])
-    shifts = Shift.query.filter_by(volunteer_id=user.id).order_by(Shift.week_number).all()
+    shifts = Shift.query.filter_by(volunteer_id=user.id).order_by(Shift.week_number).all() if user else []
 
-    user_pts = user.points or 0
+    user_pts = user.points if user and user.points else 0
     badge = {"title": "Bronze Recycler", "icon": "🥉"}
     if user_pts >= 50:
         badge = {"title": "Gold Recycler", "icon": "🥇"}
