@@ -19,6 +19,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # ---------------------------------------------------------------------------
+# ASSOCIATION TABLE FOR MULTIPLE VOLUNTEERS PER SHIFT
+# ---------------------------------------------------------------------------
+
+shift_volunteers = db.Table('shift_volunteers',
+    db.Column('shift_id', db.Integer, db.ForeignKey('shift.id'), primary_key=True),
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True)
+)
+
+# ---------------------------------------------------------------------------
 # MODELS
 # ---------------------------------------------------------------------------
 
@@ -33,7 +42,7 @@ class User(db.Model):
     submanager_job_done = db.Column(db.Boolean, default=False)
     points = db.Column(db.Integer, default=0)
 
-    shifts = db.relationship('Shift', backref='volunteer', lazy=True, foreign_keys='Shift.volunteer_id')
+    shifts = db.relationship('Shift', secondary=shift_volunteers, backref=db.backref('volunteers', lazy='dynamic'))
     comments = db.relationship('Comment', backref='volunteer', lazy=True)
 
     def set_password(self, password):
@@ -45,7 +54,6 @@ class User(db.Model):
 
 class Shift(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    volunteer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     week_number = db.Column(db.Integer, nullable=False, default=1)
     day_name = db.Column(db.String(50), nullable=False)
     shift_time = db.Column(db.String(50), nullable=False, default='12:00 PM - 12:30 PM')
@@ -165,7 +173,7 @@ def admin_dashboard():
 
     absence_data = {}
     for v in volunteers:
-        absences = Shift.query.filter_by(volunteer_id=v.id, attended=False, excused=False).count()
+        absences = Shift.query.filter(Shift.volunteers.contains(v), Shift.attended == False, Shift.excused == False).count()
         absence_data[v.id] = absences
 
     return render_template(
@@ -239,7 +247,6 @@ def delete_user(user_id):
         flash("Cannot delete primary admin account.", "error")
         return redirect(url_for('admin_dashboard'))
 
-    Shift.query.filter_by(volunteer_id=user.id).update({'volunteer_id': None})
     Comment.query.filter_by(volunteer_id=user.id).delete()
     db.session.delete(user)
     db.session.commit()
@@ -250,6 +257,7 @@ def delete_user(user_id):
 
 @app.route('/admin/generate_schedule', methods=['POST'])
 def generate_two_week_schedule():
+    """Generates 2 weeks with 4 volunteers assigned per shift slot."""
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
 
@@ -257,8 +265,8 @@ def generate_two_week_schedule():
         shift_time = request.form.get('shift_time', '12:00 PM - 12:30 PM').strip()
         volunteers = User.query.filter_by(role='volunteer').all()
 
-        if not volunteers:
-            flash("No volunteers available to schedule.", "error")
+        if len(volunteers) < 4:
+            flash("You need at least 4 volunteers to generate multi-volunteer shifts.", "error")
             return redirect(url_for('admin_dashboard'))
 
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday']
@@ -266,18 +274,20 @@ def generate_two_week_schedule():
 
         for week in [1, 2]:
             for day in days:
-                assigned_v = volunteers[v_index % len(volunteers)]
                 shift = Shift(
-                    volunteer_id=assigned_v.id,
                     week_number=week,
                     day_name=day,
                     shift_time=shift_time
                 )
+                # Assign 4 volunteers per shift
+                for _ in range(4):
+                    shift.volunteers.append(volunteers[v_index % len(volunteers)])
+                    v_index += 1
+
                 db.session.add(shift)
-                v_index += 1
 
         db.session.commit()
-        flash("Generated 2-week schedule (8 shifts total).", "success")
+        flash("Generated 2-week schedule with 4 volunteers per shift slot.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Error generating schedule: {str(e)}", "error")
@@ -291,24 +301,26 @@ def add_custom_shift():
         return redirect(url_for('login'))
 
     try:
-        volunteer_id = request.form.get('volunteer_id', type=int)
+        volunteer_ids = request.form.getlist('volunteer_ids', type=int)
         week_number = request.form.get('week_number', 1, type=int)
         day_name = request.form.get('day_name', '').strip()
         shift_time = request.form.get('shift_time', '12:00 PM - 12:30 PM').strip()
 
-        if not volunteer_id or not day_name:
-            flash("Please select a volunteer and day.", "error")
+        if not volunteer_ids or not day_name:
+            flash("Please select at least one volunteer and a day.", "error")
             return redirect(url_for('admin_dashboard'))
 
         shift = Shift(
-            volunteer_id=volunteer_id,
             week_number=week_number,
             day_name=day_name,
             shift_time=shift_time
         )
+        selected_volunteers = User.query.filter(User.id.in_(volunteer_ids)).all()
+        shift.volunteers.extend(selected_volunteers)
+
         db.session.add(shift)
         db.session.commit()
-        flash("Shift created manually successfully.", "success")
+        flash("Shift created with assigned volunteers successfully.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Error adding shift: {str(e)}", "error")
@@ -342,7 +354,7 @@ def submanager_dashboard():
 
     absence_data = {}
     for v in volunteers:
-        absences = Shift.query.filter_by(volunteer_id=v.id, attended=False, excused=False).count()
+        absences = Shift.query.filter(Shift.volunteers.contains(v), Shift.attended == False, Shift.excused == False).count()
         absence_data[v.id] = absences
 
     return render_template(
@@ -376,15 +388,15 @@ def toggle_attendance(shift_id):
     shift = Shift.query.get_or_404(shift_id)
     shift.attended = not shift.attended
 
-    if shift.volunteer:
-        current_points = shift.volunteer.points or 0
+    for volunteer in shift.volunteers:
+        current_points = volunteer.points or 0
         if shift.attended:
-            shift.volunteer.points = current_points + 10
+            volunteer.points = current_points + 10
         else:
-            shift.volunteer.points = max(0, current_points - 10)
+            volunteer.points = max(0, current_points - 10)
 
     db.session.commit()
-    flash("Attendance updated.", "success")
+    flash("Attendance updated for all assigned volunteers.", "success")
     return redirect(url_for('submanager_dashboard'))
 
 
@@ -435,7 +447,7 @@ def volunteer_dashboard():
         return redirect(url_for('login'))
 
     user = User.query.get(session['user_id'])
-    shifts = Shift.query.filter_by(volunteer_id=user.id).order_by(Shift.week_number).all() if user else []
+    shifts = Shift.query.filter(Shift.volunteers.contains(user)).order_by(Shift.week_number).all() if user else []
 
     user_pts = user.points if user and user.points else 0
     badge = {"title": "Bronze Recycler", "icon": "🥉"}
@@ -458,7 +470,8 @@ def volunteer_complete_job(shift_id):
         return redirect(url_for('login'))
 
     shift = Shift.query.get_or_404(shift_id)
-    if shift.volunteer_id == session.get('user_id'):
+    user = User.query.get(session.get('user_id'))
+    if user in shift.volunteers:
         shift.volunteer_job_done = not shift.volunteer_job_done
         db.session.commit()
         flash("Task status updated.", "success")
@@ -473,8 +486,9 @@ def submit_excuse(shift_id):
 
     shift = Shift.query.get_or_404(shift_id)
     reason = request.form.get('reason')
+    user = User.query.get(session.get('user_id'))
 
-    if shift.volunteer_id == session.get('user_id') and reason:
+    if user in shift.volunteers and reason:
         shift.excused = True
         shift.excuse_reason = reason
         db.session.commit()
@@ -515,7 +529,6 @@ with app.app_context():
     migrations = [
         'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;',
         'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS submanager_job_done BOOLEAN DEFAULT FALSE;',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS volunteer_id INTEGER REFERENCES "user"(id);',
         'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS week_number INTEGER DEFAULT 1;',
         'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS day_name VARCHAR(50);',
         'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS shift_time VARCHAR(50) DEFAULT \'12:00 PM - 12:30 PM\';',
@@ -523,7 +536,8 @@ with app.app_context():
         'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS volunteer_job_done BOOLEAN DEFAULT FALSE;',
         'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excused BOOLEAN DEFAULT FALSE;',
         'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excuse_reason TEXT;',
-        'UPDATE "user" SET points = 0 WHERE points IS NULL;'
+        'ALTER TABLE "shift" DROP COLUMN IF EXISTS volunteer_id;',
+        'ALTER TABLE "shift" DROP COLUMN IF EXISTS user_id;'
     ]
 
     for statement in migrations:
@@ -544,7 +558,6 @@ with app.app_context():
         )
         db.session.add(admin)
 
-    # Automatically sets password to ZAKK upon startup
     admin.set_password('ZAKK')
     db.session.commit()
 
