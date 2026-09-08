@@ -3,96 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FARZI - Recycling Campaign</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>{% block title %}Farzi Recycling Platform{% endblock %}</title>
     <style>
-        @keyframes dropBottle {
-            0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        :root {
+            --primary: #2e7d32;
+            --primary-hover: #1b5e20;
+            --secondary: #f4f6f8;
+            --accent: #2196f3;
+            --dark: #2c3e50;
+            --light: #ffffff;
+            --danger: #e53935;
+            --warning: #fb8c00;
+            --border: #e0e0e0;
         }
-        .falling-bottle {
-            position: fixed;
-            top: -50px;
-            font-size: 2rem;
-            pointer-events: none;
-            z-index: 9999;
-            animation: dropBottle 2.5s linear forwards;
-        }
-    </style>
-</head>
-<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
 
-    <!-- Navigation Header -->
-    <nav class="bg-emerald-700 text-white shadow-lg">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-            <a href="/" class="flex items-center space-x-3">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="FARZI Logo" class="h-10 w-auto bg-white rounded-full p-1">
-                <span class="text-2xl font-extrabold tracking-wide">FARZI</span>
-            </a>
-            <div class="space-x-4 flex items-center font-semibold">
-                <a href="/" class="hover:text-emerald-200">Home</a>
-                {% if session.get('user_id') %}
-                    {% if session.get('role') == 'admin' %}
-                        <a href="/admin/dashboard" class="hover:text-emerald-200">Manager Panel</a>
-                    {% else %}
-                        <a href="/volunteer/dashboard" class="hover:text-emerald-200">My Shifts</a>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--secondary); color: var(--dark); line-height: 1.6; padding-bottom: 60px; }
+
+        nav { background: var(--primary); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        nav a { color: white; text-decoration: none; font-weight: 600; }
+        .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+        .badge { background: var(--danger); border-radius: 50%; padding: 0.2rem 0.5rem; font-size: 0.75rem; vertical-align: super; }
+
+        .container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+        
+        .flash-messages { margin-bottom: 1.5rem; }
+        .alert { padding: 0.8rem 1.2rem; border-radius: 6px; margin-bottom: 0.5rem; color: white; font-weight: 500; }
+        .alert-success { background-color: #4caf50; }
+        .alert-error { background-color: var(--danger); }
+
+        .card { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid var(--border); }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background-color: #f8f9fa; font-weight: 600; }
+
+        .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 4px; border: none; background: var(--primary); color: white; text-decoration: none; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #c62828; }
+        .btn-small { padding: 0.25rem 0.5rem; font-size: 0.85rem; }
+
+        form label { display: block; margin-top: 0.8rem; margin-bottom: 0.2rem; font-weight: 600; }
+        form input, form select, form textarea { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: 4px; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <nav>
+        <a href="{{ url_for('home') }}" style="font-size: 1.2rem;">♻️ Farzi Recycling Initiative</a>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Home</a>
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('noticeboard') }}">
+                    Noticeboard 
+                    {% if unread_count > 0 %}
+                        <span class="badge">{{ unread_count }}</span>
                     {% endif %}
-                    <a href="/noticeboard" class="hover:text-emerald-200">Noticeboard</a>
-                    <a href="/logout" class="bg-emerald-800 px-3 py-1 rounded hover:bg-emerald-900">Logout</a>
-                {% else %}
-                    <a href="/login" class="bg-white text-emerald-800 px-4 py-1.5 rounded-full font-bold hover:bg-emerald-100">Login</a>
+                </a>
+                {% if session.get('role') == 'admin' %}
+                    <a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a>
+                {% elif session.get('role') == 'sub_manager' %}
+                    <a href="{{ url_for('submanager_dashboard') }}">Manager Dashboard</a>
+                {% elif session.get('role') == 'volunteer' %}
+                    <a href="{{ url_for('volunteer_dashboard') }}">My Dashboard</a>
                 {% endif %}
-            </div>
+                <span style="opacity: 0.9;">({{ session.get('username') }})</span>
+                <a href="{{ url_for('logout') }}" style="opacity: 0.8;">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-small">Login</a>
+            {% endif %}
         </div>
     </nav>
 
-    <!-- Flash Messages & Falling Bottle Trigger -->
-    <div class="max-w-6xl mx-auto px-4 mt-4 w-full">
+    <div class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                {% for category, message in messages %}
-                    <div id="flash-msg" data-category="{{ category }}" class="p-4 mb-4 rounded-lg text-white font-bold {% if category == 'success' %}bg-emerald-600{% else %}bg-red-600{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
             {% endif %}
         {% endwith %}
+
+        {% block content %}{% endblock %}
     </div>
 
-    <!-- Main Content Block -->
-    <main class="flex-grow">
-        {% block content %}{% endblock %}
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-emerald-900 text-emerald-100 py-6 mt-12 text-center text-sm">
-        <p>© 2026 <strong>FARZI Recycling Campaign</strong>. Secondary School Recycling Initiative.</p>
-    </footer>
-
-    <!-- Falling Bottle Animation Script -->
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const flashMsg = document.getElementById('flash-msg');
-            if (flashMsg && flashMsg.getAttribute('data-category') === 'success') {
-                createBottleRain();
-            }
-        });
-
-        function createBottleRain() {
-            const bottleIcons = ['🍾', '🧴', '♻️'];
-            for (let i = 0; i < 25; i++) {
-                setTimeout(() => {
-                    const bottle = document.createElement('div');
-                    bottle.classList.add('falling-bottle');
-                    bottle.innerText = bottleIcons[Math.floor(Math.random() * bottleIcons.length)];
-                    bottle.style.left = Math.random() * 100 + 'vw';
-                    bottle.style.animationDuration = (Math.random() * 1.5 + 1.5) + 's';
-                    document.body.appendChild(bottle);
-                    
-                    setTimeout(() => bottle.remove(), 3000);
-                }, i * 120);
-            }
-        }
-    </script>
 </body>
 </html>

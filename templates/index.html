@@ -1,27 +1,95 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% block title %}Home | Farzi Recycling Initiative{% endblock %}
+
 {% block content %}
-<div class="text-center py-12">
-    <h1 class="text-5xl font-extrabold text-slate-900 mb-4">Save Bottles, Save Tomorrow.</h1>
-    <p class="text-lg text-slate-600 max-w-2xl mx-auto mb-8">Uniting Choueifat Official Secondary School students to collect, recycle, and eliminate plastic waste for a cleaner community.</p>
+<!-- Main Campaign Overview Banner -->
+<div class="card" style="text-align: center; padding: 2.5rem; background: linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%);">
+    <h1 style="color: var(--primary); font-size: 2.2rem; margin-bottom: 0.5rem;">♻️ Plastic Waste Recycling Initiative</h1>
+    <p style="color: #555; max-width: 650px; margin: 0 auto; font-size: 1.05rem;">
+        Tracking student bottle collection, volunteer shift attendance, and environmental impact metrics.
+    </p>
+
+    <!-- Role-aware CTA Navigation Buttons -->
+    <div style="margin-top: 1.5rem;">
+        {% if not session.get('user_id') %}
+            <a href="{{ url_for('login') }}" class="btn" style="padding: 0.7rem 1.5rem; font-size: 1rem;">Volunteer & Staff Login</a>
+        {% else %}
+            {% if session.get('role') == 'admin' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="btn">Go to Admin Dashboard</a>
+            {% elif session.get('role') == 'sub_manager' %}
+                <a href="{{ url_for('submanager_dashboard') }}" class="btn">Go to Manager Dashboard</a>
+            {% else %}
+                <a href="{{ url_for('volunteer_dashboard') }}" class="btn">Go to My Volunteer Dashboard</a>
+            {% endif %}
+        {% endif %}
+    </div>
 </div>
 
-<!-- Stat Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
-        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('daily', 0) }}</h3>
-        <p class="text-sm text-slate-500 font-medium">Today's Bags</p>
+<!-- Aggregated Environmental Impact Metrics -->
+<div class="grid-4">
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">🍾</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ total_bottles }}</h3>
+        <p style="color: #666; font-size: 0.9rem;">Bottles Collected</p>
     </div>
-    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
-        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('weekly', 0) }}</h3>
-        <p class="text-sm text-slate-500 font-medium">This Week</p>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">⚖️</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ total_weight }} kg</h3>
+        <p style="color: #666; font-size: 0.9rem;">Plastic Recycled</p>
     </div>
-    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
-        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('monthly', 0) }}</h3>
-        <p class="text-sm text-slate-500 font-medium">This Month</p>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">🌱</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ co2_saved_kg }} kg</h3>
+        <p style="color: #666; font-size: 0.9rem;">Est. CO₂ Offset</p>
     </div>
-    <div class="bg-white p-6 rounded-2xl shadow-sm text-center border border-emerald-100">
-        <h3 class="text-3xl font-extrabold text-emerald-600">{{ metrics.get('yearly', 0) }}</h3>
-        <p class="text-sm text-slate-500 font-medium">Year Total</p>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">👥</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ users|length }}</h3>
+        <p style="color: #666; font-size: 0.9rem;">Total Participants</p>
     </div>
+</div>
+
+<!-- Leaderboard Ranking Section -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h2>🏆 Top Volunteer Leaderboard</h2>
+        <span style="font-size: 0.85rem; color: #666;">Top 5 Active Contributors</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Rank</th>
+                <th>Volunteer Name</th>
+                <th>Username</th>
+                <th style="text-align: right;">Points Earned</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for volunteer in leaderboard %}
+            <tr>
+                <td>
+                    {% if loop.index == 1 %}
+                        🥇 <strong>#1</strong>
+                    {% elif loop.index == 2 %}
+                        🥈 <strong>#2</strong>
+                    {% elif loop.index == 3 %}
+                        🥉 <strong>#3</strong>
+                    {% else %}
+                        <strong>#{{ loop.index }}</strong>
+                    {% endif %}
+                </td>
+                <td><strong>{{ volunteer.full_name }}</strong></td>
+                <td><span style="color: #666; font-size: 0.9rem;">@{{ volunteer.username }}</span></td>
+                <td style="text-align: right;"><strong>{{ volunteer.points or 0 }}</strong> pts</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #777; padding: 1.5rem;">
+                    No points recorded yet. Points are awarded when sub-managers confirm shift attendance!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}

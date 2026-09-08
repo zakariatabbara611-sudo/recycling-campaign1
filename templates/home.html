@@ -1,120 +1,95 @@
-{% extends "layout.html" %}
+{% extends 'base.html' %}
+{% block title %}Home | Farzi Recycling Initiative{% endblock %}
 
 {% block content %}
-<div class="row align-items-center mb-5 hero-section">
-    <div class="col-lg-7">
-        <h1 class="display-4 fw-bold text-success mb-3">Recycling Impact Tracker</h1>
-        <p class="lead text-muted">Together, our school community is making a measurable difference. Track live recycling progress, volunteer contributions, and environmental savings in real-time.</p>
-        <div class="mt-4">
-            {% if session.get('user_id') %}
-                <a href="{{ url_for('noticeboard') }}" class="btn btn-success btn-lg me-2 shadow-sm">View Noticeboard</a>
+<!-- Hero Section -->
+<div class="card" style="text-align: center; padding: 2.5rem; background: linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%);">
+    <h1 style="color: var(--primary); font-size: 2.2rem; margin-bottom: 0.5rem;">♻️ Plastic Recycling Initiative</h1>
+    <p style="color: #555; max-width: 650px; margin: 0 auto; font-size: 1.05rem;">
+        Tracking collection metrics, volunteer contributions, and environmental impact across our high school campaign.
+    </p>
+    {% if not session.get('user_id') %}
+        <div style="margin-top: 1.5rem;">
+            <a href="{{ url_for('login') }}" class="btn" style="padding: 0.7rem 1.5rem; font-size: 1rem;">Volunteer & Staff Login</a>
+        </div>
+    {% else %}
+        <div style="margin-top: 1.5rem;">
+            {% if session.get('role') == 'admin' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="btn">Go to Admin Dashboard</a>
+            {% elif session.get('role') == 'sub_manager' %}
+                <a href="{{ url_for('submanager_dashboard') }}" class="btn">Go to Manager Dashboard</a>
             {% else %}
-                <a href="{{ url_for('login') }}" class="btn btn-success btn-lg me-2 shadow-sm">Volunteer Portal Login</a>
+                <a href="{{ url_for('volunteer_dashboard') }}" class="btn">Go to My Volunteer Dashboard</a>
             {% endif %}
         </div>
+    {% endif %}
+</div>
+
+<!-- Key Impact Statistics -->
+<div class="grid-4">
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">🍾</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ total_bottles }}</h3>
+        <p style="color: #666; font-size: 0.9rem;">Bottles Collected</p>
     </div>
-    <div class="col-lg-5 text-center mt-4 mt-lg-0">
-        <div class="card border-0 shadow-lg p-4 bg-light rounded-4">
-            <h4 class="fw-bold text-success mb-3">Live Impact Metrics</h4>
-            <div class="row g-3">
-                <div class="col-6">
-                    <div class="p-3 bg-white rounded-3 shadow-sm">
-                        <h2 class="fw-bold text-dark mb-0">{{ total_bottles }}</h2>
-                        <small class="text-muted fw-semibold">Bottles Recycled</small>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="p-3 bg-white rounded-3 shadow-sm">
-                        <h2 class="fw-bold text-dark mb-0">{{ total_weight }} <span class="fs-6">kg</span></h2>
-                        <small class="text-muted fw-semibold">Plastic Weight</small>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="p-3 bg-success text-white rounded-3 shadow-sm">
-                        <h2 class="fw-bold mb-0">{{ co2_saved_kg }} <span class="fs-6">kg</span></h2>
-                        <small class="fw-semibold">Estimated CO₂ Offset</small>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">⚖️</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ total_weight }} kg</h3>
+        <p style="color: #666; font-size: 0.9rem;">Plastic Recycled</p>
+    </div>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">🌱</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ co2_saved_kg }} kg</h3>
+        <p style="color: #666; font-size: 0.9rem;">Est. CO₂ Offset</p>
+    </div>
+    <div class="card" style="text-align: center;">
+        <div style="font-size: 1.8rem; margin-bottom: 0.2rem;">👥</div>
+        <h3 style="color: var(--primary); font-size: 2rem;">{{ users|length }}</h3>
+        <p style="color: #666; font-size: 0.9rem;">Total Registered Participants</p>
     </div>
 </div>
 
-<hr class="my-5">
-
-<!-- LEADERBOARD SECTION -->
-<div class="row">
-    <div class="col-lg-6 mb-4">
-        <div class="card border-0 shadow-sm rounded-4 h-100">
-            <div class="card-header bg-white border-0 pt-4 px-4">
-                <h4 class="fw-bold text-success mb-0">🏆 Top Volunteers</h4>
-            </div>
-            <div class="card-body px-4">
-                {% if leaderboard %}
-                    <div class="list-group list-group-flush">
-                        {% for user in leaderboard %}
-                            <div class="list-group-item d-flex justify-content-between align-items-center border-0 px-0 py-3">
-                                <div class="d-flex align-items-center">
-                                    <div class="badge bg-light text-dark rounded-circle me-3 p-2 fw-bold" style="width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;">
-                                        #{{ loop.index }}
-                                    </div>
-                                    <div>
-                                        <h6 class="mb-0 fw-bold">{{ user.full_name }}</h6>
-                                        <small class="text-muted">@{{ user.username }}</small>
-                                    </div>
-                                </div>
-                                <span class="badge bg-success rounded-pill px-3 py-2 fs-6">{{ user.points or 0 }} pts</span>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-muted my-3">No volunteer points recorded yet.</p>
-                {% endif %}
-            </div>
-        </div>
+<!-- Top Volunteer Leaderboard -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h2>🏆 Top Volunteer Leaderboard</h2>
+        <span style="font-size: 0.85rem; color: #666;">Top 5 Active Contributors</span>
     </div>
-
-    <!-- COMMUNITY ROSTER SECTION -->
-    <div class="col-lg-6 mb-4">
-        <div class="card border-0 shadow-sm rounded-4 h-100">
-            <div class="card-header bg-white border-0 pt-4 px-4">
-                <h4 class="fw-bold text-dark mb-0">👥 Campaign Team</h4>
-            </div>
-            <div class="card-body px-4">
-                {% if users %}
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Role</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for u in users %}
-                                    <tr>
-                                        <td>
-                                            <strong class="text-dark">{{ u.full_name }}</strong>
-                                        </td>
-                                        <td>
-                                            {% if u.role == 'admin' %}
-                                                <span class="badge bg-danger">Admin</span>
-                                            {% elif u.role == 'sub_manager' %}
-                                                <span class="badge bg-warning text-dark">Sub-Manager</span>
-                                            {% else %}
-                                                <span class="badge bg-info text-dark">Volunteer</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="text-muted my-3">No team members logged yet.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Rank</th>
+                <th>Volunteer Name</th>
+                <th>Username</th>
+                <th style="text-align: right;">Points Earned</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for volunteer in leaderboard %}
+            <tr>
+                <td>
+                    {% if loop.index == 1 %}
+                        🥇 <strong>#1</strong>
+                    {% elif loop.index == 2 %}
+                        🥈 <strong>#2</strong>
+                    {% elif loop.index == 3 %}
+                        🥉 <strong>#3</strong>
+                    {% else %}
+                        <strong>#{{ loop.index }}</strong>
+                    {% endif %}
+                </td>
+                <td><strong>{{ volunteer.full_name }}</strong></td>
+                <td><span style="color: #666; font-size: 0.9rem;">@{{ volunteer.username }}</span></td>
+                <td style="text-align: right;"><strong>{{ volunteer.points or 0 }}</strong> pts</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #777; padding: 1.5rem;">
+                    No points recorded yet. Points are awarded when sub-managers confirm shift attendance!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}

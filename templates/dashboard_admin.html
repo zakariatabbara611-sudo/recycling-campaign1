@@ -1,300 +1,260 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard | Farzi Recycling Initiative{% endblock %}
+
 {% block content %}
-<div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Primary Manager Dashboard</h2>
+<!-- Admin Workspace Header -->
+<div class="card" style="display: flex; justify-content: space-between; align-items: center;">
     <div>
-      <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#generateScheduleModal">⚡ Generate 2-Week Schedule</button>
-      <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#addCustomShiftModal">➕ Custom Shift</button>
-      <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#addUserModal">👤 Add User Account</button>
+        <h1>Admin Control Panel</h1>
+        <p style="color: #666;">Platform Administrator: <strong>{{ session.get('username') }}</strong></p>
     </div>
-  </div>
-
-  <!-- USER DIRECTORY TABLE -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header bg-dark text-white">
-      <h5 class="mb-0">User Directory & Roles</h5>
+    <div>
+        <span style="background: #e8f5e9; color: var(--primary); font-weight: bold; padding: 0.5rem 1rem; border-radius: 4px;">
+            Full System Access
+        </span>
     </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-          <thead>
-            <tr>
-              <th>Full Name</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Points</th>
-              <th>Unexcused Absences</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for u in volunteers + sub_managers %}
-            <tr>
-              <td><strong>{{ u.full_name }}</strong></td>
-              <td>{{ u.username }}</td>
-              <td>{{ u.email or 'No email' }}</td>
-              <td>
-                <span class="badge {% if u.role == 'sub_manager' %}bg-primary{% else %}bg-secondary{% endif %}">
-                  {{ u.role }}
-                </span>
-                {% if u.assigned_day %}<small class="text-muted">({{ u.assigned_day }})</small>{% endif %}
-              </td>
-              <td><span class="badge bg-warning text-dark">⭐ {{ u.points }} pts</span></td>
-              <td>
-                <span class="badge {% if absence_data.get(u.id, 0) > 2 %}bg-danger{% else %}bg-light text-dark{% endif %}">
-                  {{ absence_data.get(u.id, 0) }} absences
-                </span>
-              </td>
-              <td>
-                <button class="btn btn-sm btn-outline-secondary me-1" data-bs-toggle="modal" data-bs-target="#editUserModal{{ u.id }}">Edit</button>
-                
-                {% if u.username != 'Zakaria' %}
-                <form action="{{ url_for('delete_user', user_id=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this user account?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
-                {% endif %}
-              </td>
-            </tr>
+</div>
 
-            <!-- EDIT USER MODAL -->
-            <div class="modal fade" id="editUserModal{{ u.id }}" tabindex="-1">
-              <div class="modal-dialog">
-                <div class="modal-content">
-                  <form action="{{ url_for('edit_user', user_id=u.id) }}" method="POST">
-                    <div class="modal-header">
-                      <h5 class="modal-title">Edit Account: {{ u.full_name }}</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                      <div class="mb-3">
-                        <label class="form-label">Full Name</label>
-                        <input type="text" name="full_name" class="form-control" value="{{ u.full_name }}" required>
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">Email Address</label>
-                        <input type="email" name="email" class="form-control" value="{{ u.email or '' }}">
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">Role</label>
-                        <select name="role" class="form-select">
-                          <option value="volunteer" {% if u.role == 'volunteer' %}selected{% endif %}>Volunteer</option>
-                          <option value="sub_manager" {% if u.role == 'sub_manager' %}selected{% endif %}>Sub-Manager</option>
-                        </select>
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">Assigned Day (For Sub-Managers)</label>
-                        <select name="assigned_day" class="form-select">
-                          <option value="">None</option>
-                          {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday'] %}
-                            <option value="{{ day }}" {% if u.assigned_day == day %}selected{% endif %}>{{ day }}</option>
-                          {% endfor %}
-                        </select>
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">Reset Password <small class="text-muted">(Leave blank to keep current)</small></label>
-                        <input type="password" name="new_password" class="form-control" placeholder="New Password">
-                      </div>
-                    </div>
-                    <div class="modal-footer">
-                      <button type="submit" class="btn btn-primary">Save Changes</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
+<div class="grid-2">
+    <!-- User Creation Form -->
+    <div class="card">
+        <h3>Create New User Account</h3>
+        <form method="POST" action="{{ url_for('add_user') }}">
+            <div>
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
             </div>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+            <div>
+                <label for="full_name">Full Name</label>
+                <input type="text" id="full_name" name="full_name" required>
+            </div>
+            <div>
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email">
+            </div>
+            <div>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div>
+                <label for="role">Role</label>
+                <select id="role" name="role" onchange="document.getElementById('assigned_day_group').style.display = (this.value === 'sub_manager' ? 'block' : 'none');">
+                    <option value="volunteer">Volunteer</option>
+                    <option value="sub_manager">Sub-Manager</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div id="assigned_day_group" style="display: none;">
+                <label for="assigned_day">Assigned Day (Sub-Managers Only)</label>
+                <select id="assigned_day" name="assigned_day">
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                </select>
+            </div>
+            <button type="submit" class="btn" style="margin-top: 1rem; width: 100%;">Create Account</button>
+        </form>
     </div>
-  </div>
 
-  <!-- ALL ASSIGNED SHIFTS TABLE -->
-  <div class="card shadow-sm">
-    <div class="card-header bg-secondary text-white">
-      <h5 class="mb-0">Master Shift Schedule</h5>
+    <!-- Schedule Management Tools -->
+    <div>
+        <!-- Auto-Generate 2-Week Schedule -->
+        <div class="card">
+            <h3>Auto-Generate 2-Week Schedule</h3>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 0.8rem;">
+                Automatically assigns 4 volunteers per shift across Monday-Thursday for 2 weeks.
+            </p>
+            <form method="POST" action="{{ url_for('generate_two_week_schedule') }}">
+                <div>
+                    <label for="shift_time">Shift Time Slot</label>
+                    <input type="text" id="shift_time" name="shift_time" value="12:00 PM - 12:30 PM" required>
+                </div>
+                <button type="submit" class="btn" style="margin-top: 1rem; width: 100%;">Generate Schedule</button>
+            </form>
+        </div>
+
+        <!-- Add Custom Shift Slot -->
+        <div class="card">
+            <h3>Add Custom Shift</h3>
+            <form method="POST" action="{{ url_for('add_custom_shift') }}">
+                <div style="display: flex; gap: 0.5rem;">
+                    <div style="flex: 1;">
+                        <label for="week_number">Week</label>
+                        <select id="week_number" name="week_number">
+                            <option value="1">Week 1</option>
+                            <option value="2">Week 2</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="day_name">Day</label>
+                        <select id="day_name" name="day_name">
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label for="shift_time">Shift Time</label>
+                    <input type="text" id="shift_time" name="shift_time" value="12:00 PM - 12:30 PM" required>
+                </div>
+                <div>
+                    <label for="volunteer_ids">Select Volunteers (Hold Ctrl/Cmd to multi-select)</label>
+                    <select id="volunteer_ids" name="volunteer_ids" multiple required style="height: 90px;">
+                        {% for v in volunteers %}
+                            <option value="{{ v.id }}">{{ v.full_name }} (@{{ v.username }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn" style="margin-top: 1rem; width: 100%;">Create Custom Shift</button>
+            </form>
+        </div>
     </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-striped mb-0 align-middle">
-          <thead>
+</div>
+
+<!-- User Accounts Table -->
+<div class="card">
+    <h2>Registered Users & Roles</h2>
+    <table>
+        <thead>
             <tr>
-              <th>Week</th>
-              <th>Day / Event</th>
-              <th>Assigned Volunteers</th>
-              <th>Time</th>
-              <th>Status</th>
-              <th>Actions</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Assigned Day / Points</th>
+                <th>Unexcused Absences</th>
+                <th>Edit Account</th>
+                <th>Action</th>
             </tr>
-          </thead>
-          <tbody>
-            {% for shift in shifts %}
+        </thead>
+        <tbody>
+            <!-- Admins & Sub-Managers & Volunteers -->
+            {% for u in sub_managers + volunteers %}
             <tr>
-              <td>Week {{ shift.week_number }}</td>
-              <td><strong>{{ shift.day_name }}</strong></td>
-              <td>
-                {% if shift.volunteers %}
-                  <div class="d-flex flex-wrap gap-1">
-                    {% for v in shift.volunteers %}
-                      <span class="badge bg-info text-dark">{{ v.full_name }}</span>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <span class="text-muted">Unassigned</span>
-                {% endif %}
-              </td>
-              <td>{{ shift.shift_time }}</td>
-              <td>
-                {% if shift.attended %}
-                  <span class="badge bg-success">Attended</span>
-                {% elif shift.excused %}
-                  <span class="badge bg-warning text-dark">Excused ({{ shift.excuse_reason }})</span>
-                {% else %}
-                  <span class="badge bg-light text-dark">Pending</span>
-                {% endif %}
-              </td>
-              <td>
-                <form action="{{ url_for('delete_shift', shift_id=shift.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Remove shift?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
-                </form>
-              </td>
+                <td>
+                    <strong>{{ u.full_name }}</strong>
+                    <div style="font-size: 0.8rem; color: #666;">@{{ u.username }} ({{ u.email or 'No email' }})</div>
+                </td>
+                <td><span style="font-weight: 600; color: var(--primary);">{{ u.role }}</span></td>
+                <td>
+                    {% if u.role == 'sub_manager' %}
+                        {{ u.assigned_day or 'Unassigned' }}
+                    {% elif u.role == 'volunteer' %}
+                        <strong>{{ u.points or 0 }}</strong> pts
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if u.role == 'volunteer' %}
+                        {% set absences = absence_data.get(u.id, 0) %}
+                        {% if absences > 0 %}
+                            <span style="color: var(--danger); font-weight: bold;">{{ absences }}</span>
+                        {% else %}
+                            <span style="color: #2e7d32;">0</span>
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    <!-- Inline Account Update Form -->
+                    <form method="POST" action="{{ url_for('edit_user', user_id=u.id) }}" style="display: flex; gap: 0.3rem;">
+                        <input type="text" name="full_name" value="{{ u.full_name }}" required placeholder="Name" style="padding: 0.3rem; font-size: 0.8rem;">
+                        <input type="email" name="email" value="{{ u.email or '' }}" placeholder="Email" style="padding: 0.3rem; font-size: 0.8rem;">
+                        <select name="role" style="padding: 0.3rem; font-size: 0.8rem;">
+                            <option value="volunteer" {% if u.role == 'volunteer' %}selected{% endif %}>Volunteer</option>
+                            <option value="sub_manager" {% if u.role == 'sub_manager' %}selected{% endif %}>Sub-Manager</option>
+                            <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                        {% if u.role == 'sub_manager' %}
+                            <select name="assigned_day" style="padding: 0.3rem; font-size: 0.8rem;">
+                                <option value="Monday" {% if u.assigned_day == 'Monday' %}selected{% endif %}>Monday</option>
+                                <option value="Tuesday" {% if u.assigned_day == 'Tuesday' %}selected{% endif %}>Tuesday</option>
+                                <option value="Wednesday" {% if u.assigned_day == 'Wednesday' %}selected{% endif %}>Wednesday</option>
+                                <option value="Thursday" {% if u.assigned_day == 'Thursday' %}selected{% endif %}>Thursday</option>
+                            </select>
+                        {% endif %}
+                        <input type="password" name="new_password" placeholder="New Pass" style="padding: 0.3rem; font-size: 0.8rem;">
+                        <button type="submit" class="btn btn-small">Save</button>
+                    </form>
+                </td>
+                <td>
+                    {% if u.username != 'Zakaria' %}
+                        <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}" onsubmit="return confirm('Are you sure you want to delete this user?');">
+                            <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                        </form>
+                    {% else %}
+                        <em style="font-size: 0.8rem; color: #888;">Primary Admin</em>
+                    {% endif %}
+                </td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="6" class="text-center text-muted py-3">No shifts scheduled yet. Click "Generate 2-Week Schedule" to create them.</td>
+                <td colspan="6" style="text-align: center; color: #777; padding: 1.5rem;">
+                    No non-admin users registered yet.
+                </td>
             </tr>
             {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+        </tbody>
+    </table>
 </div>
 
-<!-- ADD USER MODAL -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form action="{{ url_for('add_user') }}" method="POST">
-        <div class="modal-header">
-          <h5 class="modal-title">Create New Account</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Username</label>
-            <input type="text" name="username" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Full Name</label>
-            <input type="text" name="full_name" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input type="email" name="email" class="form-control">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input type="password" name="password" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Role</label>
-            <select name="role" class="form-select">
-              <option value="volunteer">Volunteer</option>
-              <option value="sub_manager">Sub-Manager</option>
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Assigned Day (If Sub-Manager)</label>
-            <select name="assigned_day" class="form-select">
-              <option value="">None</option>
-              <option value="Monday">Monday</option>
-              <option value="Tuesday">Tuesday</option>
-              <option value="Wednesday">Wednesday</option>
-              <option value="Thursday">Thursday</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Create Account</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- GENERATE 2-WEEK SCHEDULE MODAL -->
-<div class="modal fade" id="generateScheduleModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form action="{{ url_for('generate_two_week_schedule') }}" method="POST">
-        <div class="modal-header">
-          <h5 class="modal-title">Generate 2-Week Mon-Thu Schedule</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <p class="small text-muted">This will generate Monday to Thursday shifts across Weeks 1 & 2 for all current volunteers.</p>
-          <div class="mb-3">
-            <label class="form-label">Default Shift Time</label>
-            <input type="text" name="shift_time" class="form-control" value="12:00 PM - 12:30 PM" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-success">Generate Schedule</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- CUSTOM SHIFT MODAL -->
-<div class="modal fade" id="addCustomShiftModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form action="{{ url_for('add_custom_shift') }}" method="POST">
-        <div class="modal-header">
-          <h5 class="modal-title">Assign Custom Named Shift</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Select Volunteers <small class="text-muted">(Hold Ctrl or Cmd to select multiple)</small></label>
-            <select name="volunteer_ids" class="form-select" multiple required>
-              {% for v in volunteers %}
-                <option value="{{ v.id }}">{{ v.full_name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Custom Event/Shift Name</label>
-            <input type="text" name="custom_name" class="form-control" placeholder="e.g. Special Collection Drive" required>
-          </div>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Week Number</label>
-              <input type="number" name="week_number" class="form-control" value="1" min="1" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Day</label>
-              <select name="day_name" class="form-select">
-                {% for d in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] %}
-                  <option value="{{ d }}">{{ d }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Shift Hours</label>
-            <input type="text" name="shift_time" class="form-control" placeholder="1:00 PM - 2:00 PM" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Create Shift</button>
-        </div>
-      </form>
-    </div>
-  </div>
+<!-- Scheduled Shifts Master List -->
+<div class="card">
+    <h2>All Scheduled Shifts</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Shift ID</th>
+                <th>Week</th>
+                <th>Day</th>
+                <th>Time Slot</th>
+                <th>Assigned Volunteers</th>
+                <th>Status / Excuses</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for shift in shifts %}
+            <tr>
+                <td>#{{ shift.id }}</td>
+                <td>Week {{ shift.week_number }}</td>
+                <td><strong>{{ shift.day_name }}</strong></td>
+                <td>{{ shift.shift_time }}</td>
+                <td>
+                    {% for v in shift.volunteers %}
+                        <span style="display: inline-block; background: #eee; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.85rem; margin-right: 0.2rem;">
+                            {{ v.full_name }}
+                        </span>
+                    {% else %}
+                        <em style="color: #888;">None</em>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if shift.attended %}
+                        <span style="color: #2e7d32; font-weight: bold;">Attended</span>
+                    {% elif shift.excused %}
+                        <span style="color: var(--warning); font-weight: bold;">Excused:</span> {{ shift.excuse_reason }}
+                    {% else %}
+                        <span style="color: #777;">Pending</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('delete_shift', shift_id=shift.id) }}" onsubmit="return confirm('Remove this shift?');">
+                        <button type="submit" class="btn btn-small btn-danger">Delete Shift</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center; color: #777; padding: 1.5rem;">
+                    No shifts created yet. Use the schedule generator or custom shift form above.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}

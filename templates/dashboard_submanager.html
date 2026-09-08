@@ -1,125 +1,152 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% block title %}Manager Dashboard | Farzi Recycling{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <h2 class="mb-3">Sub-Manager Dashboard</h2>
-    <p class="text-muted">Assigned Supervision Day: <strong>{{ submanager.assigned_day or 'Not Assigned' }}</strong></p>
+<div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1>Sub-Manager Workspace</h1>
+        <p style="color: #666;">Manager: <strong>{{ submanager.full_name }}</strong> ({{ submanager.username }})</p>
+    </div>
+    <div>
+        <span style="font-size: 0.9rem; background: #e8f5e9; padding: 0.4rem 0.8rem; border-radius: 4px; font-weight: 600; color: var(--primary);">
+            Assigned Day: {{ submanager.assigned_day or 'Unassigned' }}
+        </span>
+    </div>
+</div>
 
-    <!-- Impact Logger & Shift Tasks -->
-    <div class="row mb-4">
-        <div class="col-md-6 mb-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Log Collection Impact</h5>
-                    <form action="{{ url_for('log_impact') }}" method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Bottles Collected</label>
-                            <input type="number" name="bottles" class="form-control" min="0" placeholder="e.g. 50">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Weight (kg)</label>
-                            <input type="number" step="0.1" name="weight" class="form-control" min="0" placeholder="e.g. 2.5">
-                        </div>
-                        <button type="submit" class="btn btn-success w-100">Log Impact</button>
-                    </form>
+<div class="grid-2">
+    <!-- Duty Status Toggle -->
+    <div class="card">
+        <h3>Supervision Status</h3>
+        <p style="margin: 0.8rem 0;">
+            Status: 
+            {% if submanager.submanager_job_done %}
+                <span style="color: #2e7d32; font-weight: bold;">✅ Shift Duty Finished</span>
+            {% else %}
+                <span style="color: var(--warning); font-weight: bold;">⏳ Duty Pending</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('submanager_complete_job') }}">
+            <button type="submit" class="btn" style="width: 100%;">Toggle Duty Status</button>
+        </form>
+    </div>
+
+    <!-- Impact Metrics Form -->
+    <div class="card">
+        <h3>Log Daily Recycled Impact</h3>
+        <form method="POST" action="{{ url_for('log_impact') }}">
+            <div style="display: flex; gap: 1rem;">
+                <div style="flex: 1;">
+                    <label for="bottles">Plastic Bottles</label>
+                    <input type="number" id="bottles" name="bottles" min="0" value="0" required>
+                </div>
+                <div style="flex: 1;">
+                    <label for="weight">Weight (kg)</label>
+                    <input type="number" id="weight" step="0.1" name="weight" min="0" value="0.0" required>
                 </div>
             </div>
-        </div>
+            <button type="submit" class="btn" style="margin-top: 1rem; width: 100%;">Record Impact</button>
+        </form>
+    </div>
+</div>
 
-        <div class="col-md-6 mb-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-body d-flex flex-column justify-content-between">
-                    <div>
-                        <h5 class="card-title">Supervision Status</h5>
-                        <p class="card-text text-muted">Mark your supervisory duties complete after inspecting collection bins.</p>
-                    </div>
-                    <form action="{{ url_for('submanager_complete_job') }}" method="POST">
-                        <button type="submit" class="btn w-100 {% if submanager.submanager_job_done %}btn-success{% else %}btn-outline-primary{% endif %}">
-                            {% if submanager.submanager_job_done %}
-                                ✓ Supervision Completed
-                            {% else %}
-                                Mark Supervision Complete
-                            {% endif %}
+<!-- Scheduled Shifts Table -->
+<div class="card">
+    <h2>Shifts Scheduled for {{ submanager.assigned_day or 'Your Assigned Day' }}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Week</th>
+                <th>Time Slot</th>
+                <th>Assigned Volunteers</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for shift in shifts %}
+            <tr>
+                <td>Week {{ shift.week_number }}</td>
+                <td>{{ shift.shift_time }}</td>
+                <td>
+                    {% for v in shift.volunteers %}
+                        <div style="margin-bottom: 0.2rem;">
+                            • <strong>{{ v.full_name }}</strong> ({{ v.username }})
+                            <span style="font-size: 0.8rem; color: #666;">- {{ v.points or 0 }} pts</span>
+                        </div>
+                    {% else %}
+                        <em style="color: #888;">No volunteers assigned</em>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if shift.attended %}
+                        <span style="color: #2e7d32; font-weight: bold;">✅ Attended (+10 pts)</span>
+                    {% else %}
+                        <span style="color: var(--danger); font-weight: bold;">⏳ Attendance Pending</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('toggle_attendance', shift_id=shift.id) }}">
+                        <button type="submit" class="btn btn-small">
+                            {% if shift.attended %}Mark Absent{% else %}Mark Attended{% endif %}
                         </button>
                     </form>
-                </div>
-            </div>
-        </div>
-    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #777; padding: 1.5rem;">
+                    No shifts scheduled for {{ submanager.assigned_day or 'your day' }}.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
-    <!-- Shifts Under Supervision -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-dark text-white">
-            <h5 class="mb-0">Shifts for {{ submanager.assigned_day }}</h5>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Week</th>
-                            <th>Shift Time</th>
-                            <th>Volunteers</th>
-                            <th>Attendance</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for shift in shifts %}
-                        <tr>
-                            <td>Week {{ shift.week_number }}</td>
-                            <td>{{ shift.shift_time }}</td>
-                            <td>
-                                {% if shift.volunteers.all() %}
-                                    <div class="d-flex flex-wrap gap-1">
-                                        {% for v in shift.volunteers %}
-                                            <span class="badge bg-info text-dark">{{ v.full_name }}</span>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">Unassigned</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <form action="{{ url_for('toggle_attendance', shift_id=shift.id) }}" method="POST">
-                                    <button type="submit" class="btn btn-sm {% if shift.attended %}btn-success{% else %}btn-outline-secondary{% endif %}">
-                                        {% if shift.attended %}✓ Attended (+10 pts each){% else %}Mark Attended{% endif %}
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="text-center py-3 text-muted">No shifts scheduled for {{ submanager.assigned_day }}.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Volunteer Feedback -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-dark text-white">
-            <h5 class="mb-0">Leave Feedback for Volunteers</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                {% for v in volunteers %}
-                <div class="col-md-6 mb-3">
-                    <div class="border rounded p-3 h-100 bg-light">
-                        <h6>{{ v.full_name }} <span class="badge bg-secondary">Absences: {{ absence_data.get(v.id, 0) }}</span></h6>
-                        <form action="{{ url_for('add_feedback', user_id=v.id) }}" method="POST" class="mt-2">
-                            <div class="input-group">
-                                <input type="text" name="comment" class="form-control" placeholder="Add note or praise..." required>
-                                <button type="submit" class="btn btn-primary">Post</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+<!-- Volunteers Feedback & Absences -->
+<div class="card">
+    <h2>Volunteer Records & Feedback</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Volunteer</th>
+                <th>Current Points</th>
+                <th>Unexcused Absences</th>
+                <th>Post Feedback Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in volunteers %}
+            <tr>
+                <td>
+                    <strong>{{ v.full_name }}</strong>
+                    <div style="font-size: 0.8rem; color: #666;">@{{ v.username }}</div>
+                </td>
+                <td><strong>{{ v.points or 0 }}</strong> pts</td>
+                <td>
+                    {% set absences = absence_data.get(v.id, 0) %}
+                    {% if absences > 0 %}
+                        <span style="color: var(--danger); font-weight: bold;">{{ absences }}</span>
+                    {% else %}
+                        <span style="color: #2e7d32;">0</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('add_feedback', user_id=v.id) }}" style="display: flex; gap: 0.5rem;">
+                        <input type="text" name="comment" placeholder="Write feedback..." required style="padding: 0.4rem; font-size: 0.9rem;">
+                        <button type="submit" class="btn btn-small">Post</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #777; padding: 1.5rem;">
+                    No volunteers registered in the platform yet.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}

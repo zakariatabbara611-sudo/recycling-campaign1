@@ -339,7 +339,7 @@ def delete_shift(shift_id):
     return redirect(url_for('admin_dashboard'))
 
 
-# --- SUB-MANAGER DASHBOARD & ACTIONS (INCLUDING ALL URL ALIASES) ---
+# --- SUB-MANAGER DASHBOARD & ACTIONS ---
 
 @app.route('/submanager')
 @app.route('/submanager_dashboard')
@@ -523,33 +523,37 @@ def noticeboard():
 
 
 # ---------------------------------------------------------------------------
-# DATABASE INITIALIZATION & AUTO-MIGRATIONS
+# DATABASE INITIALIZATION
 # ---------------------------------------------------------------------------
 
 with app.app_context():
     db.create_all()
 
-    migrations = [
-        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;',
-        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS submanager_job_done BOOLEAN DEFAULT FALSE;',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS week_number INTEGER DEFAULT 1;',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS day_name VARCHAR(50);',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS shift_time VARCHAR(50) DEFAULT \'12:00 PM - 12:30 PM\';',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE;',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS volunteer_job_done BOOLEAN DEFAULT FALSE;',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excused BOOLEAN DEFAULT FALSE;',
-        'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excuse_reason TEXT;',
-        'ALTER TABLE "shift" DROP COLUMN IF EXISTS volunteer_id;',
-        'ALTER TABLE "shift" DROP COLUMN IF EXISTS user_id;'
-    ]
+    # Executing schema migration adjustments compatible with both SQLite & Postgres
+    is_postgres = app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgresql")
 
-    for statement in migrations:
-        try:
-            db.session.execute(text(statement))
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
+    if is_postgres:
+        migrations = [
+            'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;',
+            'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS submanager_job_done BOOLEAN DEFAULT FALSE;',
+            'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS week_number INTEGER DEFAULT 1;',
+            'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS day_name VARCHAR(50);',
+            'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS shift_time VARCHAR(50) DEFAULT \'12:00 PM - 12:30 PM\';',
+            'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS attended BOOLEAN DEFAULT FALSE;',
+            'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS volunteer_job_done BOOLEAN DEFAULT FALSE;',
+            'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excused BOOLEAN DEFAULT FALSE;',
+            'ALTER TABLE "shift" ADD COLUMN IF NOT EXISTS excuse_reason TEXT;',
+            'ALTER TABLE "shift" DROP COLUMN IF EXISTS volunteer_id;',
+            'ALTER TABLE "shift" DROP COLUMN IF EXISTS user_id;'
+        ]
+        for statement in migrations:
+            try:
+                db.session.execute(text(statement))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
+    # Seed Admin User
     admin = User.query.filter_by(username='Zakaria').first()
     if not admin:
         admin = User(

@@ -1,51 +1,93 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% block title %}Volunteer Dashboard | Farzi Recycling Initiative{% endblock %}
+
 {% block content %}
-{% if tomorrow_alert %}
-<div class="bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 mb-6 rounded-r shadow-sm">
-    <p class="font-bold">⚠️ Upcoming Shift Reminder!</p>
-    <p>You have a shift scheduled. Please check your schedule below and prepare on time!</p>
+<!-- Volunteer Overview Banner -->
+<div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1>Welcome, {{ user.full_name }}!</h1>
+        <p style="color: #666;">Volunteer Account: <strong>@{{ user.username }}</strong></p>
+    </div>
+    <div style="text-align: right;">
+        <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary);">{{ badge.icon }} {{ badge.title }}</div>
+        <span style="font-size: 0.9rem; color: #666;">Total Points: <strong>{{ user.points or 0 }}</strong> pts</span>
+    </div>
 </div>
-{% endif %}
 
-<h2 class="text-3xl font-bold mb-6">My Shift Schedule</h2>
-
-<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-    <table class="w-full text-left border-collapse">
-        <thead class="bg-emerald-800 text-white">
+<!-- Scheduled Shifts Table -->
+<div class="card">
+    <h2>My Scheduled Shifts</h2>
+    <table>
+        <thead>
             <tr>
-                <th class="p-4">Week</th>
-                <th class="p-4">Day</th>
-                <th class="p-4">Shift</th>
-                <th class="p-4">Status</th>
-                <th class="p-4">Action</th>
+                <th>Week</th>
+                <th>Day</th>
+                <th>Time Slot</th>
+                <th>Attendance</th>
+                <th>Duty Status</th>
+                <th>Submit Absence Excuse</th>
             </tr>
         </thead>
         <tbody>
             {% for shift in shifts %}
-            <tr class="border-b">
-                <td class="p-4 font-semibold">Week {{ shift.week_number }}</td>
-                <td class="p-4">{{ shift.day_name }}</td>
-                <td class="p-4">{{ shift.shift_time }}</td>
-                <td class="p-4">
-                    {% if shift.excused %}
-                        <span class="text-red-500 font-bold">Excused</span>
+            <tr>
+                <td><strong>Week {{ shift.week_number }}</strong></td>
+                <td>{{ shift.day_name }}</td>
+                <td>{{ shift.shift_time }}</td>
+                <td>
+                    {% if shift.attended %}
+                        <span style="color: #2e7d32; font-weight: bold;">✅ Attended (+10 pts)</span>
+                    {% elif shift.excused %}
+                        <span style="color: var(--warning); font-weight: bold;">⚠️ Excused Pending Review</span>
                     {% else %}
-                        <span class="text-emerald-600 font-bold">Active</span>
+                        <span style="color: #777;">⏳ Scheduled</span>
                     {% endif %}
                 </td>
-                <td class="p-4">
-                    {% if not shift.excused %}
-                    <form method="POST" action="/volunteer/excuse/{{ shift.id }}" class="flex gap-2">
-                        <input type="text" name="reason" placeholder="Reason..." class="border p-1 rounded text-sm" required>
-                        <button type="submit" class="bg-red-500 text-white px-3 py-1 rounded text-sm">Submit Excuse</button>
+                <td>
+                    <form method="POST" action="{{ url_for('volunteer_complete_job', shift_id=shift.id) }}">
+                        <button type="submit" class="btn btn-small" style="background: {% if shift.volunteer_job_done %}#2e7d32{% else %}var(--primary){% endif %};">
+                            {% if shift.volunteer_job_done %}✅ Task Completed{% else %}Mark Task Done{% endif %}
+                        </button>
                     </form>
+                </td>
+                <td>
+                    {% if not shift.attended and not shift.excused %}
+                        <form method="POST" action="{{ url_for('submit_excuse', shift_id=shift.id) }}" style="display: flex; gap: 0.5rem;">
+                            <input type="text" name="reason" placeholder="Reason for absence..." required style="padding: 0.3rem; font-size: 0.85rem;">
+                            <button type="submit" class="btn btn-small btn-danger">Submit</button>
+                        </form>
+                    {% elif shift.excused %}
+                        <span style="font-size: 0.85rem; color: #555;">Reason: <em>{{ shift.excuse_reason }}</em></span>
                     {% else %}
-                        <span class="text-slate-400 text-sm">{{ shift.excuse_reason }}</span>
+                        <span style="font-size: 0.85rem; color: #2e7d32;">Shift Completed</span>
                     {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: #777; padding: 1.5rem;">
+                    You have no assigned shifts yet. Check back once the admin generates the schedule!
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<!-- Feedback Notes from Sub-Managers -->
+<div class="card">
+    <h2>Sub-Manager Feedback & Notes</h2>
+    {% if user.comments %}
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+            {% for c in user.comments %}
+                <div style="background: #f8f9fa; padding: 1rem; border-left: 4px solid var(--primary); border-radius: 4px;">
+                    <p style="margin-bottom: 0.3rem; font-size: 0.95rem;">"{{ c.comment }}"</p>
+                    <small style="color: #666;">Posted by Manager <strong>@{{ c.submanager_name }}</strong> on {{ c.created_at.strftime('%Y-%m-%d') }}</small>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="color: #777; margin-top: 0.5rem;">No manager feedback posted yet.</p>
+    {% endif %}
 </div>
 {% endblock %}

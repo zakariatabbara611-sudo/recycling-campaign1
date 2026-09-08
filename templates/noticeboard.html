@@ -1,23 +1,70 @@
-{% extends "base.html" %}
-{% block content %}
-<h2 class="text-3xl font-bold mb-6">Team Noticeboard</h2>
+{% extends 'base.html' %}
+{% block title %}Noticeboard | Farzi Recycling Initiative{% endblock %}
 
-<div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-8">
-    <form method="POST">
-        <textarea name="message" placeholder="Write a notice or update for the team..." class="w-full border p-3 rounded-lg mb-3" rows="3" required></textarea>
-        <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold">Post Notice</button>
-    </form>
+{% block content %}
+<!-- Noticeboard Header -->
+<div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1>📢 Noticeboard & Announcements</h1>
+        <p style="color: #666;">Campaign updates, schedule alerts, and notices for all volunteers and managers.</p>
+    </div>
+    {% if session.get('role') in ['admin', 'sub_manager'] %}
+        <div>
+            <span style="background: #e3f2fd; color: #1976d2; font-weight: bold; padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.9rem;">
+                Posting Enabled ({% if session.get('role') == 'admin' %}Admin{% else %}Manager{% endif %})
+            </span>
+        </div>
+    {% endif %}
 </div>
 
-<div class="space-y-4">
-    {% for notice in notices %}
-    <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-        <div class="flex justify-between items-center mb-2">
-            <span class="font-bold text-emerald-800">{{ notice.author_name }}</span>
-            <span class="text-xs text-slate-400">{{ notice.created_at.strftime('%b %d, %H:%M') }}</span>
+<!-- Notice Posting Form (Admins & Sub-Managers Only) -->
+{% if session.get('role') in ['admin', 'sub_manager'] %}
+<div class="card" style="border-left: 4px solid var(--accent);">
+    <h2>Post a New Announcement</h2>
+    <form method="POST" action="{{ url_for('post_notice') }}" style="margin-top: 1rem;">
+        <div>
+            <label for="title">Announcement Title</label>
+            <input type="text" id="title" name="title" placeholder="e.g., Collection Schedule Update for Week 2" required>
         </div>
-        <p class="text-slate-700">{{ notice.message }}</p>
-    </div>
-    {% endfor %}
+        <div>
+            <label for="message">Message Content</label>
+            <textarea id="message" name="message" rows="4" placeholder="Write your notice or update here..." required style="resize: vertical;"></textarea>
+        </div>
+        <button type="submit" class="btn" style="margin-top: 1rem;">Publish Notice</button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Announcements List -->
+<div class="card">
+    <h2>Recent Announcements</h2>
+    
+    {% if notices %}
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem;">
+            {% for notice in notices %}
+                <div style="background: #f8f9fa; border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                        <h3 style="color: var(--dark); font-size: 1.15rem;">{{ notice.title }}</h3>
+                        <span style="font-size: 0.85rem; color: #777;">
+                            {{ notice.created_at.strftime('%B %d, %Y at %I:%M %p') if notice.created_at else 'Recently' }}
+                        </span>
+                    </div>
+                    
+                    <p style="color: #333; line-height: 1.5; white-space: pre-line;">{{ notice.message }}</p>
+                    
+                    <div style="margin-top: 0.8rem; font-size: 0.85rem; color: #666; border-top: 1px dashed var(--border); padding-top: 0.5rem;">
+                        Posted by: <strong>{{ notice.author_name or 'System Administrator' }}</strong> 
+                        <span style="opacity: 0.8;">(@{{ notice.author_username or 'admin' }})</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; color: #777; padding: 2.5rem 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📭</div>
+            <p style="font-size: 1.05rem;">No announcements posted yet.</p>
+            <p style="font-size: 0.85rem; color: #999;">Check back later for campaign updates and schedule changes.</p>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -1,36 +1,27 @@
-{% extends "layout.html" %}
+{% extends 'base.html' %}
+{% block title %}Login | Farzi Recycling Initiative{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center my-5">
-    <div class="col-md-5">
-        <div class="card border-0 shadow-lg rounded-4 p-4">
-            <div class="card-body">
-                <h3 class="fw-bold text-center text-success mb-4">Portal Login</h3>
-                
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-
-                <form action="{{ url_for('login') }}" method="POST">
-                    <div class="mb-3">
-                        <label for="username" class="form-label fw-semibold">Username</label>
-                        <input type="text" class="form-control form-control-lg" id="username" name="username" required autocomplete="username">
-                    </div>
-                    <div class="mb-4">
-                        <label for="password" class="form-label fw-semibold">Password</label>
-                        <input type="password" class="form-control form-control-lg" id="password" name="password" required autocomplete="current-password">
-                    </div>
-                    <button type="submit" class="btn btn-success btn-lg w-100 shadow-sm fw-bold">Sign In</button>
-                </form>
-            </div>
+<div style="max-width: 450px; margin: 3rem auto;">
+    <div class="card">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+            <h2 style="color: var(--primary);">Welcome Back</h2>
+            <p style="color: #666; font-size: 0.95rem;">Sign in to access your recycling dashboard</p>
         </div>
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div style="margin-bottom: 1rem;">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%; padding: 0.75rem; font-size: 1rem;">Log In</button>
+        </form>
     </div>
 </div>
 {% endblock %}
