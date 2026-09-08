@@ -59,6 +59,7 @@ class User(db.Model):
     role = db.Column(db.String(20), default='volunteer')
     assigned_day = db.Column(db.String(20), nullable=True)
     submanager_job_done = db.Column(db.Boolean, default=False)
+    points = db.Column(db.Integer, default=0)
     shifts = db.relationship('Shift', backref='volunteer', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Feedback', backref='volunteer', lazy=True, cascade='all, delete-orphan')
 
@@ -66,7 +67,7 @@ class Shift(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     week_number = db.Column(db.Integer, nullable=False)
-    day_name = db.Column(db.String(20), nullable=False)
+    day_name = db.Column(db.String(50), nullable=False)
     shift_time = db.Column(db.String(50), nullable=False)
     excused = db.Column(db.Boolean, default=False)
     excuse_reason = db.Column(db.String(255), nullable=True)
@@ -85,6 +86,13 @@ class Metric(db.Model):
     category = db.Column(db.String(20), unique=True, nullable=False)
     count = db.Column(db.Integer, default=0)
 
+class ImpactLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    logged_by = db.Column(db.String(80), nullable=False)
+    bottles_collected = db.Column(db.Integer, default=0)
+    weight_kg = db.Column(db.Float, default=0.0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Notice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     author_name = db.Column(db.String(80), nullable=False)
@@ -94,27 +102,72 @@ class Notice(db.Model):
 def get_unexcused_absences(user_id):
     return Shift.query.filter_by(user_id=user_id, attended=False, excused=False).count()
 
-# --- HARD RESET DATABASE SCHEMA ON RENDER ---
-def reset_database_schema():
-    with db.engine.connect() as conn:
-        try:
-            # Drops all broken tables cleanly in PostgreSQL
-            conn.execute(text('DROP SCHEMA public CASCADE; CREATE SCHEMA public;'))
-            conn.commit()
-            print("Database schema successfully reset.")
-        except Exception as e:
-            print(f"Reset skipped or failed: {e}")
-            
-    # Rebuild all tables with all defined columns
+def calculate_user_badge(attended_shifts, points):
+    if attended_shifts >= 15 or points >= 150:
+        return {"title": "Eco Warrior", "icon": "🥇"}
+    elif attended_shifts >= 8 or points >= 80:
+        return {"title": "Recycling Champion", "icon": "🥈"}
+    elif attended_shifts >= 3 or points >= 30:
+        return {"title": "Green Contributor", "icon": "🥉"}
+    return {"title": "Rookie Recycler", "icon": "🌱"}
+
+# --- SAFE SCHEMA MIGRATION ---
+def auto_migrate_db():
     db.create_all()
+    user_cols = [
+        ("assigned_day", "VARCHAR(20)"),
+        ("submanager_job_done", "BOOLEAN DEFAULT FALSE"),
+        ("email", "VARCHAR(120)"),
+        ("points", "INTEGER DEFAULT 0")
+    ]
+    shift_cols = [
+        ("excused", "BOOLEAN DEFAULT FALSE"),
+        ("excuse_reason", "VARCHAR(255)"),
+        ("attended", "BOOLEAN DEFAULT FALSE"),
+        ("volunteer_job_done", "BOOLEAN DEFAULT FALSE")
+    ]
+
+    with db.engine.connect() as conn:
+        for col, col_type in user_cols:
+            try:
+                conn.execute(text(f'ALTER TABLE "user" ADD COLUMN {col} {col_type};'))
+                conn.commit()
+            except Exception:
+                pass
+
+        for col, col_type in shift_cols:
+            try:
+                conn.execute(text(f'ALTER TABLE shift ADD COLUMN {col} {col_type};'))
+                conn.commit()
+            except Exception:
+                pass
+
+# --- GLOBAL BELL NOTIFICATION INJECTOR ---
+@app.context_processor
+def inject_notifications():
+    if session.get('user_id'):
+        latest_notices = Notice.query.order_by(Notice.created_at.desc()).limit(5).all()
+        return dict(notifications=latest_notices, unread_count=len(latest_notices))
+    return dict(notifications=[], unread_count=0)
 
 # --- ROUTES ---
 
 @app.route('/')
 def home():
     all_users = User.query.order_by(User.full_name.asc()).all()
-    metrics = {m.category: m.count for m in Metric.query.all()}
-    return render_template('home.html', users=all_users, metrics=metrics)
+    total_bottles = db.session.query(db.func.sum(ImpactLog.bottles_collected)).scalar() or 0
+    total_weight = db.session.query(db.func.sum(ImpactLog.weight_kg)).scalar() or 0.0
+    co2_saved_kg = round(total_weight * 1.5, 2)
+    leaderboard = User.query.filter_by(role='volunteer').order_by(User.points.desc()).limit(5).all()
+    
+    return render_template(
+        'home.html', 
+        users=all_users, 
+        total_bottles=total_bottles, 
+        total_weight=total_weight, 
+        co2_saved_kg=co2_saved_kg,
+        leaderboard=leaderboard
+    )
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -144,6 +197,8 @@ def logout():
     flash("Successfully logged out.", "success")
     return redirect(url_for('home'))
 
+# --- ADMIN MANAGEMENT & USER EDITING ---
+
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if session.get('role') != 'admin':
@@ -153,10 +208,36 @@ def admin_dashboard():
     volunteers = User.query.filter_by(role='volunteer').all()
     sub_managers = User.query.filter_by(role='sub_manager').all()
     shifts = Shift.query.all()
-    
     absence_data = {v.id: get_unexcused_absences(v.id) for v in volunteers}
     
     return render_template('dashboard_admin.html', volunteers=volunteers, sub_managers=sub_managers, shifts=shifts, absence_data=absence_data)
+
+@app.route('/admin/edit_user/<int:user_id>', methods=['POST'])
+def edit_user(user_id):
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+        
+    user = User.query.get_or_404(user_id)
+    user.full_name = request.form.get('full_name', '').strip() or user.full_name
+    user.email = request.form.get('email', '').strip() or user.email
+    
+    # Role Switching (Volunteer <-> Sub-Manager)
+    new_role = request.form.get('role')
+    if new_role in ['volunteer', 'sub_manager', 'admin']:
+        user.role = new_role
+        if new_role == 'sub_manager':
+            user.assigned_day = request.form.get('assigned_day')
+        else:
+            user.assigned_day = None
+
+    # Password Update
+    new_password = request.form.get('new_password', '').strip()
+    if new_password:
+        user.password_hash = generate_password_hash(new_password)
+        
+    db.session.commit()
+    flash(f"Successfully updated {user.full_name}'s account!", "success")
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/add_user', methods=['POST'])
 def add_user():
@@ -198,24 +279,56 @@ def delete_user(user_id):
     flash("Account deleted.", "success")
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/add_shift', methods=['POST'])
-def add_shift():
+# --- AUTOMATED & CUSTOM SHIFT MANAGEMENT ---
+
+@app.route('/admin/generate_schedule', methods=['POST'])
+def generate_two_week_schedule():
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
+        
+    volunteers = User.query.filter_by(role='volunteer').all()
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday']
+    default_time = request.form.get('shift_time', '12:00 PM - 12:30 PM')
+    
+    shifts_created = 0
+    for week in [1, 2]:
+        for day in days:
+            for v in volunteers:
+                exists = Shift.query.filter_by(user_id=v.id, week_number=week, day_name=day).first()
+                if not exists:
+                    new_shift = Shift(
+                        user_id=v.id,
+                        week_number=week,
+                        day_name=day,
+                        shift_time=default_time
+                    )
+                    db.session.add(new_shift)
+                    shifts_created += 1
+                    
+    db.session.commit()
+    flash(f"Generated {shifts_created} shifts across 2 Weeks (Mon-Thu)!", "success")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/add_custom_shift', methods=['POST'])
+def add_custom_shift():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+        
     volunteer_id = request.form.get('volunteer_id')
-    week_number = request.form.get('week_number')
-    day_name = request.form.get('day_name')
-    shift_time = request.form.get('shift_time', '').strip()
+    custom_name = request.form.get('custom_name', 'Special Shift').strip()
+    week_num = int(request.form.get('week_number', 1))
+    day_name = request.form.get('day_name', 'Monday')
+    shift_time = request.form.get('shift_time', 'Special Hours').strip()
     
     new_shift = Shift(
         user_id=volunteer_id,
-        week_number=int(week_number),
-        day_name=day_name,
+        week_number=week_num,
+        day_name=f"{day_name} ({custom_name})",
         shift_time=shift_time
     )
     db.session.add(new_shift)
     db.session.commit()
-    flash("Shift assigned successfully!", "success")
+    flash(f"Custom shift '{custom_name}' assigned successfully!", "success")
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/delete_shift/<int:shift_id>', methods=['POST'])
@@ -228,6 +341,8 @@ def delete_shift(shift_id):
     flash("Shift removed.", "success")
     return redirect(url_for('admin_dashboard'))
 
+# --- SUB-MANAGER & IMPACT LOGGING ---
+
 @app.route('/submanager/dashboard')
 def submanager_dashboard():
     if session.get('role') != 'sub_manager':
@@ -237,10 +352,29 @@ def submanager_dashboard():
     submanager = User.query.get(session['user_id'])
     assigned_shifts = Shift.query.filter_by(day_name=submanager.assigned_day).all()
     volunteers = User.query.filter_by(role='volunteer').all()
-    
     absence_data = {v.id: get_unexcused_absences(v.id) for v in volunteers}
     
     return render_template('dashboard_submanager.html', submanager=submanager, shifts=assigned_shifts, volunteers=volunteers, absence_data=absence_data)
+
+@app.route('/submanager/log_impact', methods=['POST'])
+def log_impact():
+    if session.get('role') not in ['admin', 'sub_manager']:
+        return redirect(url_for('login'))
+        
+    bottles = int(request.form.get('bottles', 0))
+    weight = float(request.form.get('weight', 0.0))
+    
+    if bottles > 0 or weight > 0:
+        log = ImpactLog(
+            logged_by=session['username'],
+            bottles_collected=bottles,
+            weight_kg=weight
+        )
+        db.session.add(log)
+        db.session.commit()
+        flash("Impact analytics updated successfully!", "success")
+        
+    return redirect(request.referrer or url_for('submanager_dashboard'))
 
 @app.route('/submanager/toggle_attendance/<int:shift_id>', methods=['POST'])
 def toggle_attendance(shift_id):
@@ -248,8 +382,15 @@ def toggle_attendance(shift_id):
         return redirect(url_for('login'))
     shift = Shift.query.get_or_404(shift_id)
     shift.attended = not shift.attended
+    
+    # Award gamification points on attendance
+    if shift.attended and shift.volunteer:
+        shift.volunteer.points += 10
+    elif not shift.attended and shift.volunteer and shift.volunteer.points >= 10:
+        shift.volunteer.points -= 10
+        
     db.session.commit()
-    flash("Attendance status updated.", "success")
+    flash("Attendance and points updated.", "success")
     return redirect(request.referrer or url_for('submanager_dashboard'))
 
 @app.route('/submanager/add_feedback/<int:user_id>', methods=['POST'])
@@ -278,13 +419,18 @@ def submanager_complete_job():
     flash("Daily management job status updated.", "success")
     return redirect(url_for('submanager_dashboard'))
 
+# --- VOLUNTEER DASHBOARD ---
+
 @app.route('/volunteer/dashboard')
 def volunteer_dashboard():
     if not session.get('user_id'):
         return redirect(url_for('login'))
     user = User.query.get(session['user_id'])
     shifts = Shift.query.filter_by(user_id=user.id).all()
-    return render_template('dashboard_volunteer.html', user=user, shifts=shifts)
+    attended_count = Shift.query.filter_by(user_id=user.id, attended=True).count()
+    badge = calculate_user_badge(attended_count, user.points)
+    
+    return render_template('dashboard_volunteer.html', user=user, shifts=shifts, badge=badge)
 
 @app.route('/volunteer/complete_job/<int:shift_id>', methods=['POST'])
 def volunteer_complete_job(shift_id):
@@ -309,6 +455,8 @@ def submit_excuse(shift_id):
         flash("Excuse submitted to management.", "success")
     return redirect(url_for('volunteer_dashboard'))
 
+# --- NOTICEBOARD ---
+
 @app.route('/noticeboard', methods=['GET', 'POST'])
 def noticeboard():
     if 'user_id' not in session:
@@ -325,6 +473,8 @@ def noticeboard():
             
     notices = Notice.query.order_by(Notice.created_at.desc()).all()
     return render_template('noticeboard.html', notices=notices)
+
+# --- AUTOMATED CRON ENDPOINT ---
 
 @app.route('/api/cron/send-reminders', methods=['GET', 'POST'])
 def automated_daily_reminders():
@@ -344,10 +494,10 @@ def automated_daily_reminders():
                 
     return jsonify({"status": "success", "day_checked": tomorrow_day, "emails_sent": sent_count}), 200
 
-# --- SAFE INITIALIZATION ---
+# --- INITIALIZATION ---
 
 with app.app_context():
-    reset_database_schema()
+    auto_migrate_db()
     
     admin = User.query.filter_by(username='Zakaria').first()
     if not admin:

@@ -1,95 +1,127 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-8">
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-3xl font-bold text-emerald-800">Sub-Manager Control Panel</h1>
-            <p class="text-gray-600 font-semibold">Assigned Day: <span class="text-emerald-700 font-bold">{{ submanager.assigned_day }}</span></p>
-        </div>
-        <form method="POST" action="/submanager/complete_job">
-            <button type="submit" class="px-4 py-2 rounded font-bold text-white {% if submanager.submanager_job_done %}bg-green-600 hover:bg-green-700{% else %}bg-amber-500 hover:bg-amber-600{% endif %}">
-                {% if submanager.submanager_job_done %}✓ Sub-Manager Job Completed{% else %}Mark Sub-Manager Job Complete{% endif %}
-            </button>
-        </form>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Sub-Manager Dashboard</h2>
+    <span class="badge bg-primary fs-6">Assigned Day: {{ submanager.assigned_day }}</span>
+  </div>
+
+  <!-- DAILY MANAGEMENT JOB CHECK -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="mb-1">Daily Station Supervision Status</h5>
+        <p class="mb-0 text-muted small">Mark when you have completed supervising today's recycling collection.</p>
+      </div>
+      <form action="{{ url_for('submanager_complete_job') }}" method="POST">
+        <button type="submit" class="btn {% if submanager.submanager_job_done %}btn-success{% else %}btn-outline-success{% endif %}">
+          {% if submanager.submanager_job_done %}✓ Supervision Complete{% else %}Mark Job Completed{% endif %}
+        </button>
+      </form>
     </div>
+  </div>
 
-    <!-- Attendance Checklist for Assigned Day -->
-    <div class="bg-white p-6 rounded-lg shadow-md mb-8 border border-gray-100">
-        <h2 class="text-xl font-bold mb-4 text-gray-700">{{ submanager.assigned_day }} Shift Attendance & Job Checklists</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-100 border-b text-sm font-bold text-gray-600">
-                        <th class="p-3">Volunteer</th>
-                        <th class="p-3">Shift Time</th>
-                        <th class="p-3">Volunteer Job Done</th>
-                        <th class="p-3 text-right">Attendance Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in shifts %}
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="p-3 font-medium text-gray-800">{{ s.volunteer.full_name }}</td>
-                        <td class="p-3 text-gray-600">Week {{ s.week_number }} - {{ s.shift_time }}</td>
-                        <td class="p-3">
-                            {% if s.volunteer_job_done %}
-                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-bold">✓ Completed</span>
-                            {% else %}
-                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">Pending</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3 text-right">
-                            <form method="POST" action="/submanager/toggle_attendance/{{ s.id }}" class="inline">
-                                <button type="submit" class="text-xs px-3 py-1.5 rounded font-bold {% if s.attended %}bg-green-600 text-white{% else %}bg-red-100 text-red-700 hover:bg-red-200{% endif %}">
-                                    {% if s.attended %}✓ Attended{% else %}Mark Attended{% endif %}
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" class="p-4 text-center text-gray-500">No shifts scheduled for {{ submanager.assigned_day }}.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+  <!-- IMPACT LOGGING CARD -->
+  <div class="card shadow-sm mb-4 bg-light border-success">
+    <div class="card-body">
+      <h5 class="card-title text-success">♻️ Log Daily Recycling Collection</h5>
+      <form action="{{ url_for('log_impact') }}" method="POST" class="row g-3 mt-1">
+        <div class="col-md-5">
+          <label class="form-label small fw-bold">Plastic Bottles Collected</label>
+          <input type="number" name="bottles" class="form-control" placeholder="e.g. 150" min="0">
         </div>
+        <div class="col-md-5">
+          <label class="form-label small fw-bold">Total Weight Collected (kg)</label>
+          <input type="number" step="0.1" name="weight" class="form-control" placeholder="e.g. 4.5" min="0">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-success w-100">Submit Log</button>
+        </div>
+      </form>
     </div>
+  </div>
 
-    <!-- Volunteer Performance Feedback & Absence Alerts -->
-    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-100">
-        <h2 class="text-xl font-bold mb-4 text-gray-700">Volunteer Feedback & Absence Warnings</h2>
-        <div class="space-y-6">
-            {% for v in volunteers %}
-            <div class="p-4 border rounded-lg bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center">
-                <div class="mb-4 md:mb-0">
-                    <h3 class="font-bold text-lg text-gray-800">{{ v.full_name }} (@{{ v.username }})</h3>
-                    {% if absence_data[v.id] >= 3 %}
-                        <span class="inline-block mt-1 text-xs bg-red-600 text-white px-2 py-1 rounded font-bold animate-pulse">
-                            🚨 Warning: {{ absence_data[v.id] }} Unexcused Absences (Notify Manager to Delete)
-                        </span>
-                    {% else %}
-                        <span class="inline-block mt-1 text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded font-semibold">
-                            Unexcused Absences: {{ absence_data[v.id] }}
-                        </span>
-                    {% endif %}
-                    
-                    <!-- Display Feedback History -->
-                    <div class="mt-2 space-y-1">
-                        {% for fb in v.comments %}
-                        <p class="text-xs text-gray-600"><strong>@{{ fb.submanager_name }}:</strong> {{ fb.comment }}</p>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <!-- Add Comment Form -->
-                <form method="POST" action="/submanager/add_feedback/{{ v.id }}" class="flex gap-2 w-full md:w-auto">
-                    <input type="text" name="comment" placeholder="Leave feedback..." class="border p-2 rounded text-sm w-full md:w-64" required>
-                    <button type="submit" class="bg-emerald-600 text-white px-3 py-2 rounded text-xs font-bold hover:bg-emerald-700">Comment</button>
+  <!-- TODAY'S SHIFTS ATTENDANCE TABLE -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white">
+      <h5 class="mb-0">Shifts Scheduled for {{ submanager.assigned_day }}</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Week</th>
+              <th>Volunteer</th>
+              <th>Shift Time</th>
+              <th>Attendance</th>
+              <th>Job Done</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for shift in shifts %}
+            <tr>
+              <td>Week {{ shift.week_number }}</td>
+              <td><strong>{{ shift.volunteer.full_name if shift.volunteer else 'Unassigned' }}</strong></td>
+              <td>{{ shift.shift_time }}</td>
+              <td>
+                {% if shift.attended %}
+                  <span class="badge bg-success">Attended (+10 pts)</span>
+                {% elif shift.excused %}
+                  <span class="badge bg-warning text-dark">Excused ({{ shift.excuse_reason }})</span>
+                {% else %}
+                  <span class="badge bg-danger">Absent</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if shift.volunteer_job_done %}
+                  <span class="badge bg-info text-dark">Done</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                <form action="{{ url_for('toggle_attendance', shift_id=shift.id) }}" method="POST" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-primary">Toggle Attendance</button>
                 </form>
-            </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-3">No shifts scheduled for {{ submanager.assigned_day }}.</td>
+            </tr>
             {% endfor %}
-        </div>
+          </tbody>
+        </table>
+      </div>
     </div>
+  </div>
+
+  <!-- VOLUNTEER FEEDBACK & COMMENTS -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-secondary text-white">
+      <h5 class="mb-0">Post Volunteer Feedback</h5>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        {% for v in volunteers %}
+        <div class="col-md-6 mb-3">
+          <div class="border rounded p-3 h-100 bg-white">
+            <h6 class="fw-bold mb-1">{{ v.full_name }}</h6>
+            <small class="text-muted d-block mb-2">Unexcused Absences: {{ absence_data.get(v.id, 0) }}</small>
+            
+            <form action="{{ url_for('add_feedback', user_id=v.id) }}" method="POST">
+              <div class="input-group">
+                <input type="text" name="comment" class="form-control form-control-sm" placeholder="Write feedback..." required>
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Post</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

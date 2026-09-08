@@ -1,244 +1,290 @@
-{% extends "base.html" %}
-
+{% extends "layout.html" %}
 {% block content %}
-<div class="max-w-6xl mx-auto space-y-8">
-    <div class="bg-white p-6 rounded-xl shadow-md flex justify-between items-center border-l-4 border-emerald-600">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800">Primary Manager Dashboard</h1>
-            <p class="text-gray-600">Overview of volunteers, sub-managers, and shift assignments</p>
-        </div>
-        <a href="/noticeboard" class="bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700">Go to Noticeboard</a>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Primary Manager Dashboard</h2>
+    <div>
+      <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#generateScheduleModal">⚡ Generate 2-Week Schedule</button>
+      <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#addCustomShiftModal">➕ Custom Shift</button>
+      <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#addUserModal">👤 Add User Account</button>
     </div>
+  </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- CREATE USER FORM -->
-        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Create New Account</h2>
-            <form method="POST" action="/admin/add_user" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Full Name</label>
-                    <input type="text" name="full_name" required class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Username</label>
-                    <input type="text" name="username" required class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Email Address (For Shift Reminders)</label>
-                    <input type="email" name="email" placeholder="volunteer@example.com" class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Password</label>
-                    <input type="password" name="password" required class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Role</label>
-                    <select name="role" class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                        <option value="volunteer">Volunteer</option>
-                        <option value="sub_manager">Sub-Manager</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Assigned Day (If Sub-Manager)</label>
-                    <select name="assigned_day" class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                        <option value="Monday">Monday</option>
-                        <option value="Tuesday">Tuesday</option>
-                        <option value="Wednesday">Wednesday</option>
-                        <option value="Thursday">Thursday</option>
-                        <option value="Friday">Friday</option>
-                    </select>
-                </div>
-                <button type="submit" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 w-full transition">
-                    Create Account
-                </button>
-            </form>
-        </div>
-
-        <!-- ASSIGN SHIFT FORM -->
-        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Assign Shift to Volunteer</h2>
-            <form method="POST" action="/admin/add_shift" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Select Volunteer</label>
-                    <select name="volunteer_id" required class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                        {% for v in volunteers %}
-                        <option value="{{ v.id }}">{{ v.full_name }} (@{{ v.username }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Week Number</label>
-                    <input type="number" name="week_number" min="1" max="52" required class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Day of the Week</label>
-                    <select name="day_name" class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                        <option value="Monday">Monday</option>
-                        <option value="Tuesday">Tuesday</option>
-                        <option value="Wednesday">Wednesday</option>
-                        <option value="Thursday">Thursday</option>
-                        <option value="Friday">Friday</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700">Shift Time</label>
-                    <input type="text" name="shift_time" placeholder="e.g. 10:00 AM - 10:30 AM" required class="w-full p-2 border rounded focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <button type="submit" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 w-full transition">
-                    Assign Shift
-                </button>
-            </form>
-        </div>
+  <!-- USER DIRECTORY TABLE -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white">
+      <h5 class="mb-0">User Directory & Roles</h5>
     </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Full Name</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Points</th>
+              <th>Unexcused Absences</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in volunteers + sub_managers %}
+            <tr>
+              <td><strong>{{ u.full_name }}</strong></td>
+              <td>{{ u.username }}</td>
+              <td>{{ u.email or 'No email' }}</td>
+              <td>
+                <span class="badge {% if u.role == 'sub_manager' %}bg-primary{% else %}bg-secondary{% endif %}">
+                  {{ u.role }}
+                </span>
+                {% if u.assigned_day %}<small class="text-muted">({{ u.assigned_day }})</small>{% endif %}
+              </td>
+              <td><span class="badge bg-warning text-dark">⭐ {{ u.points }} pts</span></td>
+              <td>
+                <span class="badge {% if absence_data.get(u.id, 0) > 2 %}bg-danger{% else %}bg-light text-dark{% endif %}">
+                  {{ absence_data.get(u.id, 0) }} absences
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-secondary me-1" data-bs-toggle="modal" data-bs-target="#editUserModal{{ u.id }}">Edit</button>
+                
+                {% if u.username != 'Zakaria' %}
+                <form action="{{ url_for('delete_user', user_id=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this user account?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
 
-    <!-- SUB-MANAGERS OVERVIEW -->
-    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Sub-Managers</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-100 text-gray-700">
-                        <th class="p-3 border-b">Name</th>
-                        <th class="p-3 border-b">Username</th>
-                        <th class="p-3 border-b">Email</th>
-                        <th class="p-3 border-b">Assigned Day</th>
-                        <th class="p-3 border-b">Daily Job Status</th>
-                        <th class="p-3 border-b">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sm in sub_managers %}
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="p-3 font-semibold text-gray-800">{{ sm.full_name }}</td>
-                        <td class="p-3 text-gray-600">@{{ sm.username }}</td>
-                        <td class="p-3 text-gray-600">{{ sm.email if sm.email else 'N/A' }}</td>
-                        <td class="p-3 font-medium text-emerald-700">{{ sm.assigned_day }}</td>
-                        <td class="p-3">
-                            {% if sm.submanager_job_done %}
-                            <span class="px-2 py-1 text-xs font-bold bg-green-100 text-green-800 rounded-full">Completed</span>
-                            {% else %}
-                            <span class="px-2 py-1 text-xs font-bold bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3">
-                            <form method="POST" action="/admin/delete_user/{{ sm.id }}" onsubmit="return confirm('Delete this sub-manager?');">
-                                <button type="submit" class="text-red-600 hover:text-red-800 font-semibold text-sm">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="6" class="p-4 text-center text-gray-500">No sub-managers created yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+            <!-- EDIT USER MODAL -->
+            <div class="modal fade" id="editUserModal{{ u.id }}" tabindex="-1">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form action="{{ url_for('edit_user', user_id=u.id) }}" method="POST">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Edit Account: {{ u.full_name }}</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="full_name" class="form-control" value="{{ u.full_name }}" required>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" name="email" class="form-control" value="{{ u.email or '' }}">
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select name="role" class="form-select">
+                          <option value="volunteer" {% if u.role == 'volunteer' %}selected{% endif %}>Volunteer</option>
+                          <option value="sub_manager" {% if u.role == 'sub_manager' %}selected{% endif %}>Sub-Manager</option>
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Assigned Day (For Sub-Managers)</label>
+                        <select name="assigned_day" class="form-select">
+                          <option value="">None</option>
+                          {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday'] %}
+                            <option value="{{ day }}" {% if u.assigned_day == day %}selected{% endif %}>{{ day }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label">Reset Password <small class="text-muted">(Leave blank to keep current)</small></label>
+                        <input type="password" name="new_password" class="form-control" placeholder="New Password">
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+  </div>
 
-    <!-- VOLUNTEERS & ABSENCES -->
-    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">Volunteers Roster & Unexcused Absences</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-100 text-gray-700">
-                        <th class="p-3 border-b">Name</th>
-                        <th class="p-3 border-b">Username</th>
-                        <th class="p-3 border-b">Email</th>
-                        <th class="p-3 border-b">Unexcused Absences</th>
-                        <th class="p-3 border-b">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for v in volunteers %}
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="p-3 font-semibold text-gray-800">{{ v.full_name }}</td>
-                        <td class="p-3 text-gray-600">@{{ v.username }}</td>
-                        <td class="p-3 text-gray-600">{{ v.email if v.email else 'N/A' }}</td>
-                        <td class="p-3">
-                            {% set absences = absence_data.get(v.id, 0) %}
-                            {% if absences >= 2 %}
-                            <span class="px-2 py-1 text-xs font-bold bg-red-100 text-red-800 rounded-full">{{ absences }} Absences (Warning)</span>
-                            {% else %}
-                            <span class="px-2 py-1 text-xs font-bold bg-green-100 text-green-800 rounded-full">{{ absences }} Absences</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3">
-                            <form method="POST" action="/admin/delete_user/{{ v.id }}" onsubmit="return confirm('Delete this volunteer account?');">
-                                <button type="submit" class="text-red-600 hover:text-red-800 font-semibold text-sm">Delete Account</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="p-4 text-center text-gray-500">No volunteers registered yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  <!-- ALL ASSIGNED SHIFTS TABLE -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-secondary text-white">
+      <h5 class="mb-0">Master Shift Schedule</h5>
     </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-striped mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Week</th>
+              <th>Day / Event</th>
+              <th>Volunteer</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for shift in shifts %}
+            <tr>
+              <td>Week {{ shift.week_number }}</td>
+              <td><strong>{{ shift.day_name }}</strong></td>
+              <td>{{ shift.volunteer.full_name if shift.volunteer else 'Unassigned' }}</td>
+              <td>{{ shift.shift_time }}</td>
+              <td>
+                {% if shift.attended %}
+                  <span class="badge bg-success">Attended</span>
+                {% elif shift.excused %}
+                  <span class="badge bg-warning text-dark">Excused ({{ shift.excuse_reason }})</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                <form action="{{ url_for('delete_shift', shift_id=shift.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Remove shift?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-3">No shifts scheduled yet. Click "Generate 2-Week Schedule" to create them.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <!-- MASTER SHIFT LIST -->
-    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">All Assigned Shifts</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-100 text-gray-700">
-                        <th class="p-3 border-b">Volunteer</th>
-                        <th class="p-3 border-b">Week</th>
-                        <th class="p-3 border-b">Day</th>
-                        <th class="p-3 border-b">Time</th>
-                        <th class="p-3 border-b">Attended</th>
-                        <th class="p-3 border-b">Job Done</th>
-                        <th class="p-3 border-b">Excuse</th>
-                        <th class="p-3 border-b">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in shifts %}
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="p-3 font-semibold text-gray-800">{{ s.volunteer.full_name if s.volunteer else 'Deleted' }}</td>
-                        <td class="p-3 text-gray-600">Week {{ s.week_number }}</td>
-                        <td class="p-3 text-gray-600">{{ s.day_name }}</td>
-                        <td class="p-3 text-gray-600">{{ s.shift_time }}</td>
-                        <td class="p-3">
-                            {% if s.attended %}
-                            <span class="text-green-600 font-bold">Yes</span>
-                            {% else %}
-                            <span class="text-red-500 font-bold">No</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3">
-                            {% if s.volunteer_job_done %}
-                            <span class="text-green-600 font-bold">Done</span>
-                            {% else %}
-                            <span class="text-gray-400">Pending</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3">
-                            {% if s.excused %}
-                            <span class="text-xs bg-yellow-100 text-yellow-800 p-1 rounded" title="{{ s.excuse_reason }}">Excused</span>
-                            {% else %}
-                            <span class="text-gray-400 text-sm">None</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3">
-                            <form method="POST" action="/admin/delete_shift/{{ s.id }}">
-                                <button type="submit" class="text-red-600 hover:text-red-800 font-semibold text-sm">Remove</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="8" class="p-4 text-center text-gray-500">No shifts assigned yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<!-- ADD USER MODAL -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('add_user') }}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">Create New Account</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" name="username" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="full_name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select name="role" class="form-select">
+              <option value="volunteer">Volunteer</option>
+              <option value="sub_manager">Sub-Manager</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Assigned Day (If Sub-Manager)</label>
+            <select name="assigned_day" class="form-select">
+              <option value="">None</option>
+              <option value="Monday">Monday</option>
+              <option value="Tuesday">Tuesday</option>
+              <option value="Wednesday">Wednesday</option>
+              <option value="Thursday">Thursday</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Create Account</button>
+        </div>
+      </form>
     </div>
+  </div>
+</div>
+
+<!-- GENERATE 2-WEEK SCHEDULE MODAL -->
+<div class="modal fade" id="generateScheduleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('generate_two_week_schedule') }}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">Generate 2-Week Mon-Thu Schedule</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted">This will generate Monday to Thursday shifts across Weeks 1 & 2 for all current volunteers.</p>
+          <div class="mb-3">
+            <label class="form-label">Default Shift Time</label>
+            <input type="text" name="shift_time" class="form-control" value="12:00 PM - 12:30 PM" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Generate Schedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM SHIFT MODAL -->
+<div class="modal fade" id="addCustomShiftModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('add_custom_shift') }}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title">Assign Custom Named Shift</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Volunteer</label>
+            <select name="volunteer_id" class="form-select" required>
+              {% for v in volunteers %}
+                <option value="{{ v.id }}">{{ v.full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Custom Event/Shift Name</label>
+            <input type="text" name="custom_name" class="form-control" placeholder="e.g. Special Collection Drive" required>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Week Number</label>
+              <input type="number" name="week_number" class="form-control" value="1" min="1" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Day</label>
+              <select name="day_name" class="form-select">
+                {% for d in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] %}
+                  <option value="{{ d }}">{{ d }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Shift Hours</label>
+            <input type="text" name="shift_time" class="form-control" placeholder="1:00 PM - 2:00 PM" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Create Shift</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 {% endblock %}
