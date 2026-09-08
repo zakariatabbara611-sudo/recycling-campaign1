@@ -123,6 +123,20 @@ def home():
     )
 
 
+# Added alias so templates calling url_for('index') won't fail
+@app.route('/index')
+def index():
+    if 'user_id' in session:
+        role = session.get('role')
+        if role == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        elif role == 'sub_manager':
+            return redirect(url_for('submanager_dashboard'))
+        elif role == 'volunteer':
+            return redirect(url_for('volunteer_dashboard'))
+    return redirect(url_for('home'))
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -522,6 +536,25 @@ def noticeboard():
     return render_template('noticeboard.html', notices=notices)
 
 
+# Added explicit handler for forms submitting directly to /post_notice
+@app.route('/post_notice', methods=['POST'])
+def post_notice():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+
+    message = request.form.get('message')
+    if message:
+        notice = Notice(
+            author_name=session.get('username'),
+            message=message
+        )
+        db.session.add(notice)
+        db.session.commit()
+        flash("Notice posted to board.", "success")
+
+    return redirect(url_for('noticeboard'))
+
+
 # ---------------------------------------------------------------------------
 # DATABASE INITIALIZATION
 # ---------------------------------------------------------------------------
@@ -559,7 +592,7 @@ with app.app_context():
         admin = User(
             username='Zakaria',
             full_name='Zakaria Tabbara',
-            email='admin@school.edu',
+            email='Zakariatabbara611@gmail.com',
             role='admin',
             points=0
         )
