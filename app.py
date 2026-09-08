@@ -253,30 +253,35 @@ def generate_two_week_schedule():
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
 
-    shift_time = request.form.get('shift_time', '12:00 PM - 12:30 PM')
-    volunteers = User.query.filter_by(role='volunteer').all()
+    try:
+        shift_time = request.form.get('shift_time', '12:00 PM - 12:30 PM').strip()
+        volunteers = User.query.filter_by(role='volunteer').all()
 
-    if not volunteers:
-        flash("No volunteers found to generate schedule.", "error")
-        return redirect(url_for('admin_dashboard'))
+        if not volunteers:
+            flash("No volunteers available to schedule.", "error")
+            return redirect(url_for('admin_dashboard'))
 
-    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday']
-    v_index = 0
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday']
+        v_index = 0
 
-    for week in [1, 2]:
-        for day in days:
-            assigned_v = volunteers[v_index % len(volunteers)]
-            shift = Shift(
-                volunteer_id=assigned_v.id,
-                week_number=week,
-                day_name=day,
-                shift_time=shift_time
-            )
-            db.session.add(shift)
-            v_index += 1
+        for week in [1, 2]:
+            for day in days:
+                assigned_v = volunteers[v_index % len(volunteers)]
+                shift = Shift(
+                    volunteer_id=assigned_v.id,
+                    week_number=week,
+                    day_name=day,
+                    shift_time=shift_time
+                )
+                db.session.add(shift)
+                v_index += 1
 
-    db.session.commit()
-    flash("2-Week Schedule generated successfully!", "success")
+        db.session.commit()
+        flash("Generated 2-week schedule (8 shifts total).", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error generating schedule: {str(e)}", "error")
+
     return redirect(url_for('admin_dashboard'))
 
 
@@ -285,22 +290,29 @@ def add_custom_shift():
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
 
-    volunteer_id = request.form.get('volunteer_id')
-    custom_name = request.form.get('custom_name')
-    week_number = request.form.get('week_number', 1, type=int)
-    day_name = request.form.get('day_name')
-    shift_time = request.form.get('shift_time')
+    try:
+        volunteer_id = request.form.get('volunteer_id', type=int)
+        week_number = request.form.get('week_number', 1, type=int)
+        day_name = request.form.get('day_name', '').strip()
+        shift_time = request.form.get('shift_time', '12:00 PM - 12:30 PM').strip()
 
-    shift = Shift(
-        volunteer_id=volunteer_id,
-        week_number=week_number,
-        day_name=f"{day_name} ({custom_name})",
-        shift_time=shift_time
-    )
-    db.session.add(shift)
-    db.session.commit()
+        if not volunteer_id or not day_name:
+            flash("Please select a volunteer and day.", "error")
+            return redirect(url_for('admin_dashboard'))
 
-    flash("Custom shift assigned successfully.", "success")
+        shift = Shift(
+            volunteer_id=volunteer_id,
+            week_number=week_number,
+            day_name=day_name,
+            shift_time=shift_time
+        )
+        db.session.add(shift)
+        db.session.commit()
+        flash("Shift created manually successfully.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error adding shift: {str(e)}", "error")
+
     return redirect(url_for('admin_dashboard'))
 
 
@@ -500,7 +512,6 @@ def noticeboard():
 with app.app_context():
     db.create_all()
 
-    # Dynamic migrations for existing PostgreSQL tables
     migrations = [
         'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;',
         'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS submanager_job_done BOOLEAN DEFAULT FALSE;',
@@ -531,9 +542,11 @@ with app.app_context():
             role='admin',
             points=0
         )
-        admin.set_password('AdminPassword123')
         db.session.add(admin)
-        db.session.commit()
+
+    # Automatically sets password to ZAKK upon startup
+    admin.set_password('ZAKK')
+    db.session.commit()
 
 if __name__ == '__main__':
     app.run(debug=True)
