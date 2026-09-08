@@ -101,7 +101,7 @@ def inject_notifications():
 
 
 # ---------------------------------------------------------------------------
-# ROUTES
+# ROUTES & ALIASES
 # ---------------------------------------------------------------------------
 
 @app.route('/')
@@ -162,6 +162,7 @@ def logout():
 # --- ADMIN DASHBOARD & ACTIONS ---
 
 @app.route('/admin')
+@app.route('/admin_dashboard')
 def admin_dashboard():
     if session.get('role') != 'admin':
         flash("Unauthorized access.", "error")
@@ -257,7 +258,6 @@ def delete_user(user_id):
 
 @app.route('/admin/generate_schedule', methods=['POST'])
 def generate_two_week_schedule():
-    """Generates 2 weeks with 4 volunteers assigned per shift slot."""
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
 
@@ -279,7 +279,6 @@ def generate_two_week_schedule():
                     day_name=day,
                     shift_time=shift_time
                 )
-                # Assign 4 volunteers per shift
                 for _ in range(4):
                     shift.volunteers.append(volunteers[v_index % len(volunteers)])
                     v_index += 1
@@ -340,9 +339,12 @@ def delete_shift(shift_id):
     return redirect(url_for('admin_dashboard'))
 
 
-# --- SUB-MANAGER DASHBOARD & ACTIONS ---
+# --- SUB-MANAGER DASHBOARD & ACTIONS (INCLUDING ALL URL ALIASES) ---
 
 @app.route('/submanager')
+@app.route('/submanager_dashboard')
+@app.route('/manager_dashboard')
+@app.route('/manager')
 def submanager_dashboard():
     if session.get('role') != 'sub_manager':
         flash("Unauthorized access.", "error")
@@ -441,6 +443,7 @@ def add_feedback(user_id):
 # --- VOLUNTEER DASHBOARD & ACTIONS ---
 
 @app.route('/volunteer')
+@app.route('/volunteer_dashboard')
 def volunteer_dashboard():
     if session.get('role') != 'volunteer':
         flash("Unauthorized access.", "error")
