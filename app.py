@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import text
+from sqlalchemy import text, nullslast
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'default-dev-key-change-in-prod')
@@ -47,7 +47,7 @@ class Shift(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     volunteer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     week_number = db.Column(db.Integer, nullable=False, default=1)
-    day_name = db.Column(db.String(20), nullable=False)  # Monday, Tuesday, etc. or Custom Event Name
+    day_name = db.Column(db.String(20), nullable=False)
     shift_time = db.Column(db.String(50), nullable=False, default='12:00 PM - 12:30 PM')
     attended = db.Column(db.Boolean, default=False)
     volunteer_job_done = db.Column(db.Boolean, default=False)
@@ -78,7 +78,7 @@ class Notice(db.Model):
 
 
 # ---------------------------------------------------------------------------
-# GLOBAL CONTEXT PROCESSOR (FOR NOTIFICATIONS BELL)
+# GLOBAL CONTEXT PROCESSOR
 # ---------------------------------------------------------------------------
 
 @app.context_processor
@@ -99,7 +99,7 @@ def home():
     total_weight = db.session.query(db.func.sum(ImpactLog.weight_kg)).scalar() or 0
     co2_saved = round(total_weight * 1.5, 2)
 
-    leaderboard = User.query.filter_by(role='volunteer').order_by(User.points.desc()).limit(5).all()
+    leaderboard = User.query.filter_by(role='volunteer').order_by(nullslast(User.points.desc())).limit(5).all()
     all_users = User.query.all()
 
     return render_template(
@@ -191,7 +191,8 @@ def add_user():
         full_name=full_name,
         email=email,
         role=role,
-        assigned_day=assigned_day if role == 'sub_manager' else None
+        assigned_day=assigned_day if role == 'sub_manager' else None,
+        points=0
     )
     new_user.set_password(password)
     db.session.add(new_user)
@@ -231,7 +232,6 @@ def delete_user(user_id):
         flash("Cannot delete primary admin account.", "error")
         return redirect(url_for('admin_dashboard'))
 
-    # Unassign shifts and delete user
     Shift.query.filter_by(volunteer_id=user.id).update({'volunteer_id': None})
     Comment.query.filter_by(volunteer_id=user.id).delete()
     db.session.delete(user)
@@ -357,10 +357,11 @@ def toggle_attendance(shift_id):
     shift.attended = not shift.attended
 
     if shift.volunteer:
+        current_points = shift.volunteer.points or 0
         if shift.attended:
-            shift.volunteer.points += 10
+            shift.volunteer.points = current_points + 10
         else:
-            shift.volunteer.points = max(0, shift.volunteer.points - 10)
+            shift.volunteer.points = max(0, current_points - 10)
 
     db.session.commit()
     flash("Attendance updated.", "success")
@@ -416,11 +417,11 @@ def volunteer_dashboard():
     user = User.query.get(session['user_id'])
     shifts = Shift.query.filter_by(volunteer_id=user.id).order_by(Shift.week_number).all()
 
-    # Calculate Badge
+    user_pts = user.points or 0
     badge = {"title": "Bronze Recycler", "icon": "🥉"}
-    if user.points >= 50:
+    if user_pts >= 50:
         badge = {"title": "Gold Recycler", "icon": "🥇"}
-    elif user.points >= 20:
+    elif user_pts >= 20:
         badge = {"title": "Silver Recycler", "icon": "🥈"}
 
     return render_template(
@@ -489,26 +490,25 @@ def noticeboard():
 # ---------------------------------------------------------------------------
 
 with app.app_context():
-    # 1. Create missing tables
     db.create_all()
 
-    # 2. Safely add missing columns to existing database tables
     try:
         db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;'))
         db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS submanager_job_done BOOLEAN DEFAULT FALSE;'))
+        db.session.execute(text('UPDATE "user" SET points = 0 WHERE points IS NULL;'))
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         print(f"Migration Note: {e}")
 
-    # 3. Create initial Admin account if it doesn't exist
     admin = User.query.filter_by(username='Zakaria').first()
     if not admin:
         admin = User(
             username='Zakaria',
             full_name='Zakaria Tabbara',
             email='admin@school.edu',
-            role='admin'
+            role='admin',
+            points=0
         )
         admin.set_password('AdminPassword123')
         db.session.add(admin)
