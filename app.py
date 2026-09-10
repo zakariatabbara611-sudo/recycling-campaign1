@@ -18,6 +18,12 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL or 'sqlite:///farzi_recycling.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Fix stale PostgreSQL connection drops on Render
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 280,
+}
+
 # Email Configuration
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
