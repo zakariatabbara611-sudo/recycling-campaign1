@@ -1,4 +1,5 @@
 import os
+import threading
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
@@ -36,11 +37,20 @@ db = SQLAlchemy(app)
 mail = Mail(app)
 
 # ---------------------------------------------------------------------------
-# EMAIL HELPER FUNCTION
+# EMAIL HELPER FUNCTIONS (ASYNC THREADED)
 # ---------------------------------------------------------------------------
 
+def send_async_email(app_obj, msg):
+    """Sends email in a background thread using the Flask application context."""
+    with app_obj.app_context():
+        try:
+            mail.send(msg)
+        except Exception as e:
+            print(f"Background email error: {str(e)}")
+
+
 def send_email(subject, recipients, body):
-    """Safely sends an email without crashing the application if SMTP fails."""
+    """Dispatches email sending to a background thread to prevent Render HTTP timeouts."""
     if not app.config['MAIL_USERNAME']:
         print(f"Skipped sending email '{subject}' - MAIL_USERNAME not configured.")
         return
@@ -58,9 +68,10 @@ def send_email(subject, recipients, body):
             recipients=recipients,
             body=body
         )
-        mail.send(msg)
+        app_obj = app._get_current_object()
+        threading.Thread(target=send_async_email, args=(app_obj, msg)).start()
     except Exception as e:
-        print(f"Failed to send email to {recipients}: {str(e)}")
+        print(f"Failed to start email thread: {str(e)}")
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +98,7 @@ class User(db.Model):
     submanager_job_done = db.Column(db.Boolean, default=False)
     points = db.Column(db.Integer, default=0)
 
-    shifts = db.relationship('Shift', secondary=shift_volunteers, backref=db.backref('volunteers', lazy='dynamic'))
+    shifts = db.relationship('Shift', secondary=shift_volunteers, backref=db.backref('volunteers', lazy='select'))
     comments = db.relationship('Comment', backref='volunteer', lazy=True)
 
     def set_password(self, password):
