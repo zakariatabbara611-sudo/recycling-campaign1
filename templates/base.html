@@ -3,78 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Farzi Recycling Platform{% endblock %}</title>
+    <title>{% block title %}Farzi Recycling Initiative{% endblock %}</title>
     <style>
         :root {
             --primary: #2e7d32;
             --primary-hover: #1b5e20;
-            --secondary: #f4f6f8;
-            --accent: #2196f3;
-            --dark: #2c3e50;
-            --light: #ffffff;
-            --danger: #e53935;
-            --warning: #fb8c00;
+            --accent: #1976d2;
+            --dark: #212121;
+            --light: #f4f6f8;
             --border: #e0e0e0;
+            --danger: #d32f2f;
+            --warning: #f57c00;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background-color: var(--secondary); color: var(--dark); line-height: 1.6; padding-bottom: 60px; }
-
-        nav { background: var(--primary); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        nav a { color: white; text-decoration: none; font-weight: 600; }
-        .nav-links { display: flex; gap: 1.5rem; align-items: center; }
-        .badge { background: var(--danger); border-radius: 50%; padding: 0.2rem 0.5rem; font-size: 0.75rem; vertical-align: super; }
-
+        body { background: var(--light); color: var(--dark); line-height: 1.6; }
+        nav { background: #fff; border-bottom: 1px solid var(--border); padding: 0.8rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .nav-brand { font-weight: bold; font-size: 1.2rem; color: var(--primary); text-decoration: none; }
+        .nav-links { display: flex; gap: 1.2rem; align-items: center; }
+        .nav-links a { color: #555; text-decoration: none; font-weight: 500; font-size: 0.95rem; }
+        .nav-links a:hover { color: var(--primary); }
         .container { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
-        
-        .flash-messages { margin-bottom: 1.5rem; }
-        .alert { padding: 0.8rem 1.2rem; border-radius: 6px; margin-bottom: 0.5rem; color: white; font-weight: 500; }
-        .alert-success { background-color: #4caf50; }
-        .alert-error { background-color: var(--danger); }
-
-        .card { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid var(--border); }
-        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
-        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background-color: #f8f9fa; font-weight: 600; }
-
-        .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 4px; border: none; background: var(--primary); color: white; text-decoration: none; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .card { background: #fff; padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        input, select, textarea { width: 100%; padding: 0.6rem; margin-top: 0.3rem; margin-bottom: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95rem; }
+        label { font-size: 0.85rem; font-weight: 600; color: #444; }
+        .btn { background: var(--primary); color: #fff; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
         .btn:hover { background: var(--primary-hover); }
+        .btn-small { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
         .btn-danger { background: var(--danger); }
-        .btn-danger:hover { background: #c62828; }
-        .btn-small { padding: 0.25rem 0.5rem; font-size: 0.85rem; }
-
-        form label { display: block; margin-top: 0.8rem; margin-bottom: 0.2rem; font-weight: 600; }
-        form input, form select, form textarea { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: 4px; }
+        .btn-danger:hover { background: #b71c1c; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        th { background: #f8f9fa; color: #555; }
+        .alert { padding: 0.8rem 1.2rem; border-radius: 4px; margin-bottom: 1.5rem; font-weight: 500; font-size: 0.95rem; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .alert-danger { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .alert-warning { background: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
+        .alert-info { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
     </style>
-    {% block extra_css %}{% endblock %}
 </head>
 <body>
-
     <nav>
-        <a href="{{ url_for('home') }}" style="font-size: 1.2rem;">♻️ Farzi Recycling Initiative</a>
+        <a href="{{ url_for('index') }}" class="nav-brand">♻️ Farzi Recycling</a>
         <div class="nav-links">
-            <a href="{{ url_for('home') }}">Home</a>
             {% if session.get('user_id') %}
-                <a href="{{ url_for('noticeboard') }}">
-                    Noticeboard 
-                    {% if unread_count > 0 %}
-                        <span class="badge">{{ unread_count }}</span>
-                    {% endif %}
-                </a>
-                {% if session.get('role') == 'admin' %}
-                    <a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a>
-                {% elif session.get('role') == 'sub_manager' %}
-                    <a href="{{ url_for('submanager_dashboard') }}">Manager Dashboard</a>
-                {% elif session.get('role') == 'volunteer' %}
-                    <a href="{{ url_for('volunteer_dashboard') }}">My Dashboard</a>
-                {% endif %}
-                <span style="opacity: 0.9;">({{ session.get('username') }})</span>
-                <a href="{{ url_for('logout') }}" style="opacity: 0.8;">Logout</a>
+                <a href="{{ url_for('index') }}">Dashboard</a>
+                <a href="{{ url_for('noticeboard') }}">Noticeboard</a>
+                <span style="color: #aaa;">|</span>
+                <span style="font-size: 0.9rem; color: #666;">Logged in as <strong>{{ session.get('username') }}</strong></span>
+                <a href="{{ url_for('logout') }}" style="color: var(--danger);">Logout</a>
             {% else %}
-                <a href="{{ url_for('login') }}" class="btn btn-small">Login</a>
+                <a href="{{ url_for('login') }}">Login</a>
             {% endif %}
         </div>
     </nav>
@@ -82,16 +62,13 @@
     <div class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="flash-messages">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
             {% endif %}
         {% endwith %}
 
         {% block content %}{% endblock %}
     </div>
-
 </body>
 </html>
