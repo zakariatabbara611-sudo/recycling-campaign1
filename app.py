@@ -2,8 +2,10 @@ import os
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
+from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import text, nullslast
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'default-dev-key-change-in-prod')
@@ -16,7 +18,44 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL or 'sqlite:///farzi_recycling.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Email Configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'Zakariatabbara611@gmail.com')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'phenthfjibgauhns')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'Zakariatabbara611@gmail.com')
+
 db = SQLAlchemy(app)
+mail = Mail(app)
+
+# ---------------------------------------------------------------------------
+# EMAIL HELPER FUNCTION
+# ---------------------------------------------------------------------------
+
+def send_email(subject, recipients, body):
+    """Safely sends an email without crashing the application if SMTP fails."""
+    if not app.config['MAIL_USERNAME']:
+        print(f"Skipped sending email '{subject}' - MAIL_USERNAME not configured.")
+        return
+    
+    if isinstance(recipients, str):
+        recipients = [recipients]
+        
+    recipients = [r for r in recipients if r]
+    if not recipients:
+        return
+
+    try:
+        msg = Message(
+            subject=subject,
+            recipients=recipients,
+            body=body
+        )
+        mail.send(msg)
+    except Exception as e:
+        print(f"Failed to send email to {recipients}: {str(e)}")
+
 
 # ---------------------------------------------------------------------------
 # ASSOCIATION TABLE FOR MULTIPLE VOLUNTEERS PER SHIFT
@@ -123,7 +162,6 @@ def home():
     )
 
 
-# Added alias so templates calling url_for('index') won't fail
 @app.route('/index')
 def index():
     if 'user_id' in session:
@@ -228,6 +266,19 @@ def add_user():
     db.session.add(new_user)
     db.session.commit()
 
+    if email:
+        send_email(
+            subject="Welcome to Farzi Recycling Portal",
+            recipients=[email],
+            body=(
+                f"Hello {full_name},\n\n"
+                f"Your account on the Farzi Recycling Portal has been created successfully!\n\n"
+                f"Username: {username}\n"
+                f"Role: {role.title()}\n\n"
+                f"Please log in to check your schedule and tasks."
+            )
+        )
+
     flash(f"User {full_name} created successfully.", "success")
     return redirect(url_for('admin_dashboard'))
 
@@ -300,6 +351,19 @@ def generate_two_week_schedule():
                 db.session.add(shift)
 
         db.session.commit()
+
+        for v in volunteers:
+            if v.email:
+                send_email(
+                    subject="New 2-Week Recycling Schedule Published",
+                    recipients=[v.email],
+                    body=(
+                        f"Hello {v.full_name},\n\n"
+                        f"A new 2-week recycling shift schedule has been published.\n"
+                        f"Please log in to your dashboard to view your assigned shifts."
+                    )
+                )
+
         flash("Generated 2-week schedule with 4 volunteers per shift slot.", "success")
     except Exception as e:
         db.session.rollback()
@@ -333,6 +397,22 @@ def add_custom_shift():
 
         db.session.add(shift)
         db.session.commit()
+
+        for v in selected_volunteers:
+            if v.email:
+                send_email(
+                    subject="New Shift Assigned",
+                    recipients=[v.email],
+                    body=(
+                        f"Hello {v.full_name},\n\n"
+                        f"You have been assigned to a new shift:\n"
+                        f"- Week: {week_number}\n"
+                        f"- Day: {day_name}\n"
+                        f"- Time: {shift_time}\n\n"
+                        f"Log in to your dashboard for details."
+                    )
+                )
+
         flash("Shift created with assigned volunteers successfully.", "success")
     except Exception as e:
         db.session.rollback()
@@ -449,6 +529,20 @@ def add_feedback(user_id):
         )
         db.session.add(c)
         db.session.commit()
+
+        volunteer = User.query.get(user_id)
+        if volunteer and volunteer.email:
+            send_email(
+                subject="New Feedback Received",
+                recipients=[volunteer.email],
+                body=(
+                    f"Hello {volunteer.full_name},\n\n"
+                    f"Sub-manager '{session.get('username')}' posted feedback on your profile:\n\n"
+                    f"\"{comment_text}\"\n\n"
+                    f"Check your portal dashboard for details."
+                )
+            )
+
         flash("Feedback posted.", "success")
 
     return redirect(url_for('submanager_dashboard'))
@@ -509,6 +603,22 @@ def submit_excuse(shift_id):
         shift.excused = True
         shift.excuse_reason = reason
         db.session.commit()
+
+        managers = User.query.filter(User.role.in_(['admin', 'sub_manager'])).all()
+        manager_emails = [m.email for m in managers if m.email]
+        if manager_emails:
+            send_email(
+                subject=f"Shift Excuse Submitted by {user.full_name}",
+                recipients=manager_emails,
+                body=(
+                    f"Volunteer {user.full_name} submitted an excuse for the following shift:\n\n"
+                    f"- Day: {shift.day_name} (Week {shift.week_number})\n"
+                    f"- Time: {shift.shift_time}\n"
+                    f"- Reason: {reason}\n\n"
+                    f"Please review this in the sub-manager/admin dashboard."
+                )
+            )
+
         flash("Excuse submitted.", "success")
 
     return redirect(url_for('volunteer_dashboard'))
@@ -536,7 +646,6 @@ def noticeboard():
     return render_template('noticeboard.html', notices=notices)
 
 
-# Added explicit handler for forms submitting directly to /post_notice
 @app.route('/post_notice', methods=['POST'])
 def post_notice():
     if not session.get('user_id'):
@@ -562,7 +671,6 @@ def post_notice():
 with app.app_context():
     db.create_all()
 
-    # Executing schema migration adjustments compatible with both SQLite & Postgres
     is_postgres = app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgresql")
 
     if is_postgres:
@@ -586,7 +694,6 @@ with app.app_context():
             except Exception:
                 db.session.rollback()
 
-    # Seed Admin User
     admin = User.query.filter_by(username='Zakaria').first()
     if not admin:
         admin = User(
